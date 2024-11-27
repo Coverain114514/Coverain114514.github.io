@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Interface</title>
+    <style>
+        #chat-window {
+            width: 300px;
+            height: 400px;
+            overflow: auto;
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+        #message-input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+        }
+        #send-button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        #send-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+ 
+<div id="chat-window">
+    <!-- Messages will be displayed here -->
+</div>
+ 
+<input type="text" id="message-input" placeholder="Type your message here..." />
+<button id="send-button">Send</button>
+ 
+<script>
+    // JavaScript code to handle sending and receiving messages will go here
+    document.getElementById('send-button').addEventListener('click', function() {
+        var message = document.getElementById('message-input').value;
+        if (message) {
+            // Send the message to the server
+            // ...
+ 
+            // Add the message to the chat window
+            var chatWindow = document.getElementById('chat-window');
+            chatWindow.innerHTML += '<p>' + message + '</p>';
+ 
+            // Clear the message input
+            document.getElementById('message-input').value = '';
+        }
+    });
+</script>
+ 
+</body>
+</html>
