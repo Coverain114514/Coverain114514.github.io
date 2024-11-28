@@ -243,6 +243,23 @@ document.addEventListener('DOMContentLoaded', () => {
     loadBlogs();
     initializeEventListeners();
 });
-
+// 在初始化事件监听器函数中添加
+function initializeEventListeners() {
+    // 关闭按钮事件
+    document.querySelector('.close').onclick = function() {
+        document.getElementById('blogModal').style.display = 'none';
+    }
+    
+    // 点击模态框外部关闭
+    window.onclick = function(event) {
+        const modal = document.getElementById('blogModal');
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    // 评论表单提交事件
+    document.getElementById('commentForm').onsubmit = handleComment;
+}
 // 页面加载时初始化
 window.onload = loadBlogs;
