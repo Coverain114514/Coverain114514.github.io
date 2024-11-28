@@ -1,6 +1,6 @@
 ﻿// API 配置
 const API_CONFIG = {
-    url: 'https://api.jsonbin.io/v3/b/6747c8c19fd07d161ce49649', // 替换为你的 BIN ID
+    url: 'https://api.jsonbin.io/v3/b/6747cfdeacd3cb34a8b03128', // 替换为你的 BIN ID
     headers: {
         'Content-Type': 'application/json',
         'X-Master-Key': '$2a$10$ZfWNgnKO6UkPdcgrP./iwOCZEhJhmid0yXdRIMJgp9GQT307tbJ9G', // 替换为你的 API KEY
