@@ -420,7 +420,6 @@ body {
     line-height: 1.6;
 }
 
-/* ��������ʽ */
 .navbar {
     display: flex;
     justify-content: space-between;
@@ -441,7 +440,6 @@ body {
     color: #333;
 }
 
-/* ��Ҫ�����ʽ */
 .hero {
     text-align: center;
     padding: 4rem 2rem;
@@ -463,7 +461,6 @@ body {
     cursor: pointer;
 }
 
-/* ��ɫ������ʽ */
 .features-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -477,10 +474,10 @@ body {
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-/* ҳ����ʽ */
 footer {
     text-align: center;
     padding: 2rem;
     background-color: #333;
     color: white;
+    flex: 0 0 auto;
 }
