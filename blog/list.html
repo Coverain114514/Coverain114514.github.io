@@ -39,15 +39,41 @@
         <div id="blogList" class="blog-list"></div>
 
         <!-- 博客详情弹窗 -->
-        <div id="blogModal" class="modal">
+        <!-- 博客详情模态框 -->
+<div id="blogModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <div class="blog-detail">
+            <h2 id="modalTitle"></h2>
+            <div id="modalAuthor" class="blog-author"></div>
+            <div id="modalContent" class="blog-content"></div>
+            <div id="modalDate" class="blog-date"></div>
             
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2 id="modalTitle"></h2>
-                <div id="modalContent"></div>
-                <div id="modalDate"></div>
+            <!-- 点赞区域 -->
+            <div class="like-section">
+                <button id="modalLikeBtn" class="btn-like">
+                    <span class="like-icon">❤️</span>
+                    <span class="like-count">0</span>
+                </button>
+            </div>
+            
+            <!-- 评论区域 -->
+            <div class="comment-section">
+                <h3>评论区</h3>
+                <form id="commentForm" class="comment-form">
+                    <div class="form-group">
+                        <input type="text" id="commentAuthor" placeholder="你的昵称" required>
+                    </div>
+                    <div class="form-group">
+                        <textarea id="commentContent" placeholder="写下你的评论..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">发表评论</button>
+                </form>
+                <div id="commentList" class="comment-list"></div>
             </div>
         </div>
+    </div>
+</div>
     </div>
     <!-- ... 前面的代码保持不变 ... -->
 <div id="blogModal" class="modal">
