@@ -14,7 +14,73 @@
 .comment-form {
     margin: 20px 0;
 }
+/* 评论模态框样式 */
+#commentModal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
 
+#commentModal .modal-content {
+    background-color: white;
+    margin: 10% auto;
+    padding: 20px;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 8px;
+    position: relative;
+}
+
+.close-comment {
+    position: absolute;
+    right: 20px;
+    top: 10px;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+/* 博客列表项样式 */
+.blog-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px;
+    border: 1px solid #ddd;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+.blog-content {
+    flex: 1;
+    cursor: pointer;
+}
+
+.blog-actions {
+    display: flex;
+    gap: 10px;
+    margin-left: 15px;
+}
+
+.btn-like,
+.btn-comment {
+    background: none;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-like:hover,
+.btn-comment:hover {
+    transform: scale(1.1);
+}
 .comment-form .form-group {
     margin-bottom: 15px;
 }
