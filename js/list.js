@@ -23,6 +23,7 @@ async function loadBlogs() {
 }
 
 // 显示博客列表
+
 function displayBlogs() {
     const blogList = document.getElementById('blogList');
     blogList.innerHTML = '';
@@ -33,37 +34,107 @@ function displayBlogs() {
         blogItem.innerHTML = `
             <h3>${blog.title}</h3>
             <div class="blog-meta">
-                <span>作者: ${blog.author}</span> | 
-                <span>❤️ ${blog.likes || 0}</span> | 
-                <span>💬 ${blog.comments?.length || 0}</span>
+                <span>作者: ${blog.author}</span>
+                <div class="action-buttons">
+                    <button class="btn-like" data-index="${index}">
+                        <span class="like-icon">❤️</span>
+                        <span class="like-count">${blog.likes || 0}</span>
+                    </button>
+                    <button class="btn-comment" data-index="${index}">
+                        <span>💬</span>
+                        <span>${blog.comments?.length || 0}</span>
+                    </button>
+                </div>
             </div>
-            <p>${blog.content.substring(0, 100)}...</p>
+            <p class="blog-preview">${blog.content.substring(0, 100)}...</p>
             <small>发布时间：${new Date(blog.date).toLocaleString()}</small>
         `;
-        blogItem.onclick = () => showBlogDetail(index);
+
+        // 为整个博客项添加点击事件（查看详情）
+        blogItem.querySelector('.blog-preview').addEventListener('click', () => showBlogDetail(index));
+        blogItem.querySelector('h3').addEventListener('click', () => showBlogDetail(index));
+
+        // 为点赞按钮添加单独的点击事件
+        const likeBtn = blogItem.querySelector('.btn-like');
+        likeBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 阻止事件冒泡
+            handleLike(index, e);
+        });
+
+        // 为评论按钮添加单独的点击事件
+        const commentBtn = blogItem.querySelector('.btn-comment');
+        commentBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 阻止事件冒泡
+            showBlogDetail(index, true); // true 表示直接跳转到评论区
+        });
+
         blogList.appendChild(blogItem);
     });
 }
 
+// 修改处理点赞的函数
+async function handleLike(index, e) {
+    e.preventDefault();
+    const userId = localStorage.getItem('userId') || generateUserId();
+    
+    if (!blogs[index].likedBy) blogs[index].likedBy = [];
+    if (!blogs[index].likes) blogs[index].likes = 0;
+    
+    const isLiked = blogs[index].likedBy.includes(userId);
+    
+    try {
+        if (!isLiked) {
+            blogs[index].likes++;
+            blogs[index].likedBy.push(userId);
+        } else {
+            blogs[index].likes--;
+            blogs[index].likedBy = blogs[index].likedBy.filter(id => id !== userId);
+        }
+        
+        // 更新JSONBin
+        await fetch(`${BASE_URL}/${BIN_ID}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': API_KEY
+            },
+            body: JSON.stringify({ blogs })
+        });
+        
+        // 只更新列表显示，不显示详情
+        displayBlogs();
+        
+    } catch (error) {
+        console.error('点赞失败:', error);
+        alert('点赞操作失败，请重试');
+    }
+}
+
 // 修改显示博客详情的函数
-function showBlogDetail(index) {
+function showBlogDetail(index, scrollToComments = false) {
     currentBlog = blogs[index];
     const modal = document.getElementById('blogModal');
     
-    // 更新博客内容
     document.getElementById('modalTitle').textContent = currentBlog.title;
     document.getElementById('modalAuthor').textContent = `作者：${currentBlog.author}`;
     document.getElementById('modalContent').innerHTML = currentBlog.content;
     document.getElementById('modalDate').textContent = 
         `发布时间：${new Date(currentBlog.date).toLocaleString()}`;
     
-    // 更新点赞状态
-    updateLikeStatus();
-    
-    // 加载评论
+    updateLikeStatus(index);
     loadComments();
     
     modal.style.display = 'block';
+
+    // 如果需要滚动到评论区
+    if (scrollToComments) {
+        const commentSection = document.querySelector('.comment-section');
+        if (commentSection) {
+            setTimeout(() => {
+                commentSection.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+    }
 }
 
 // 更新点赞状态的函数
@@ -88,54 +159,7 @@ function updateLikeStatus() {
 }
 
 // 处理点赞的函数
-async function handleLike(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const userId = localStorage.getItem('userId') || generateUserId();
-    const blogIndex = blogs.findIndex(b => b.date === currentBlog.date);
-    
-    // 确保必要的属性存在
-    if (!blogs[blogIndex].likedBy) blogs[blogIndex].likedBy = [];
-    if (!blogs[blogIndex].likes) blogs[blogIndex].likes = 0;
-    
-    const isLiked = blogs[blogIndex].likedBy.includes(userId);
-    
-    try {
-        if (!isLiked) {
-            // 添加点赞
-            blogs[blogIndex].likes++;
-            blogs[blogIndex].likedBy.push(userId);
-        } else {
-            // 取消点赞
-            blogs[blogIndex].likes--;
-            blogs[blogIndex].likedBy = blogs[blogIndex].likedBy.filter(id => id !== userId);
-        }
-        
-        // 更新JSONBin
-        await fetch(`${BASE_URL}/${BIN_ID}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': API_KEY
-            },
-            body: JSON.stringify({ blogs })
-        });
-        
-        // 更新当前博客对象
-        currentBlog = blogs[blogIndex];
-        
-        // 更新UI
-        updateLikeStatus();
-        
-        // 可选：更新列表显示
-        displayBlogs();
-        
-    } catch (error) {
-        console.error('点赞操作失败:', error);
-        alert('点赞失败，请重试');
-    }
-}
+
 
 // 初始化事件监听器
 function initializeEventListeners() {
