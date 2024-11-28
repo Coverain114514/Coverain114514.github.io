@@ -1,5 +1,5 @@
 ﻿const API_KEY = '$2a$10$nX0PT8wbblMuHpGyw.iCWOwHCuzlcqdZBy9A8BjmEvyCpGrWm7Eay';
-const BIN_ID = '6747cfdeacd3cb34a8b03128';
+const BIN_ID = '67481f67acd3cb34a8b0577b';
 const BASE_URL = 'https://api.jsonbin.io/v3/b';
 
 let currentBlog = null;
