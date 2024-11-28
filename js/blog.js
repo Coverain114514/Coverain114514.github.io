@@ -8,15 +8,27 @@ const API_CONFIG = {
     }
 };
 
+
 // 显示/隐藏加载动画
 function toggleLoading(show) {
-    document.getElementById('loading').style.display = show ? 'block' : 'none';
+    const loading = document.getElementById('loading');
+    if (loading) {
+        loading.style.display = show ? 'block' : 'none';
+    }
 }
 
-// 获取所有文章
-async function fetchPosts() {
+// 提交博客
+async function submitBlog(event) {
+    event.preventDefault();
+    
+    const title = document.getElementById('blogTitle').value;
+    const category = document.getElementById('blogCategory').value;
+    const content = document.getElementById('blogContent').value;
+    
     try {
         toggleLoading(true);
+        
+        // 获取现有博客列表
         const response = await fetch(API_CONFIG.url, {
             method: 'GET',
             headers: API_CONFIG.headers
@@ -24,185 +36,102 @@ async function fetchPosts() {
         
         if (!response.ok) throw new Error('获取数据失败');
         
-        const posts = await response.json();
-        displayPosts(posts || []);
-    } catch (error) {
-        console.error('Error:', error);
-        alert('获取文章失败，请稍后重试');
-    } finally {
-        toggleLoading(false);
-    }
-}
-
-// 更新文章数据
-async function updatePosts(posts) {
-    try {
-        toggleLoading(true);
-        const response = await fetch(API_CONFIG.url, {
+        let blogs = await response.json();
+        if (!Array.isArray(blogs)) blogs = [];
+        
+        // 创建新博客
+        const newBlog = {
+            id: Date.now(),
+            title,
+            category,
+            content,
+            date: new Date().toLocaleString(),
+            author: '匿名用户', // 可以改为实际的用户名
+            likes: 0,
+            comments: []
+        };
+        
+        // 添加到博客列表
+        blogs.unshift(newBlog);
+        
+        // 更新数据
+        const updateResponse = await fetch(API_CONFIG.url, {
             method: 'PUT',
             headers: API_CONFIG.headers,
-            body: JSON.stringify(posts)
+            body: JSON.stringify(blogs)
         });
         
-        if (!response.ok) throw new Error('更新数据失败');
+        if (!updateResponse.ok) throw new Error('发布失败');
         
-        return true;
+        alert('博客发布成功！');
+        window.location.href = 'list.html'; // 发布成功后跳转到博客列表
+        
     } catch (error) {
         console.error('Error:', error);
-        alert('更新失败，请稍后重试');
-        return false;
+        alert('发布失败，请稍后重试');
     } finally {
         toggleLoading(false);
     }
 }
 
-// 显示发布文章表单
-function showAddPost() {
-    document.getElementById('addPostForm').classList.remove('hidden');
-}
-
-// 添加新文章
-async function addPost(event) {
-    event.preventDefault();
-    
-    const title = document.getElementById('postTitle').value;
-    const content = document.getElementById('postContent').value;
+// 如果在博客列表页面，则加载博客列表
+async function loadBlogs() {
+    if (!document.getElementById('blogList')) return;
     
     try {
         toggleLoading(true);
         
-        // 获取当前文章列表
         const response = await fetch(API_CONFIG.url, {
             method: 'GET',
             headers: API_CONFIG.headers
         });
         
-        const posts = await response.json() || [];
+        if (!response.ok) throw new Error('获取数据失败');
         
-        // 添加新文章
-        const newPost = {
-            id: Date.now(),
-            title,
-            content,
-            date: new Date().toLocaleString(),
-            likes: 0,
-            comments: []
-        };
+        const blogs = await response.json();
+        displayBlogs(blogs || []);
         
-        posts.unshift(newPost);
-        
-        // 更新数据
-        const success = await updatePosts(posts);
-        
-        if (success) {
-            document.getElementById('postTitle').value = '';
-            document.getElementById('postContent').value = '';
-            document.getElementById('addPostForm').classList.add('hidden');
-            fetchPosts();
-        }
     } catch (error) {
         console.error('Error:', error);
-        alert('发布失败，请稍后重试');
+        alert('获取博客列表失败，请稍后重试');
+    } finally {
+        toggleLoading(false);
     }
 }
 
-// 显示文章列表
-function displayPosts(posts) {
-    const postsDiv = document.getElementById('postsList');
+// 显示博客列表
+function displayBlogs(blogs) {
+    const blogList = document.getElementById('blogList');
+    if (!blogList) return;
     
-    postsDiv.innerHTML = posts.map(post => `
-        <article class="post" data-id="${post.id}">
-            <h2>${post.title}</h2>
-            <div class="post-meta">发布于: ${post.date}</div>
-            <div class="post-content">${post.content}</div>
-            <div class="post-actions">
-                <button onclick="likePost(${post.id})">
-                    👍 ${post.likes}
-                </button>
-                <button onclick="showComments(${post.id})">
-                    💬 ${post.comments.length}
-                </button>
+    blogList.innerHTML = blogs.map(blog => `
+        <article class="blog-card">
+            <h2>${blog.title}</h2>
+            <div class="blog-meta">
+                <span>作者: ${blog.author}</span>
+                <span>分类: ${blog.category}</span>
+                <span>发布于: ${blog.date}</span>
             </div>
-            <div class="comments-section hidden" id="comments-${post.id}">
-                <div class="comments-list">
-                    ${post.comments.map(comment => `
-                        <div class="comment">
-                            <p>${comment.text}</p>
-                            <small>${comment.date}</small>
-                        </div>
-                    `).join('')}
-                </div>
-                <form onsubmit="addComment(event, ${post.id})">
-                    <input type="text" placeholder="添加评论" required>
-                    <button type="submit">发送</button>
-                </form>
+            <div class="blog-content">
+                ${blog.content}
+            </div>
+            <div class="blog-actions">
+                <button onclick="likeBlog(${blog.id})">
+                    👍 ${blog.likes}
+                </button>
+                <button onclick="showComments(${blog.id})">
+                    💬 ${blog.comments.length}
+                </button>
             </div>
         </article>
     `).join('');
 }
 
-// 点赞功能
-async function likePost(postId) {
-    try {
-        const response = await fetch(API_CONFIG.url, {
-            method: 'GET',
-            headers: API_CONFIG.headers
-        });
-        
-        const posts = await response.json();
-        const post = posts.find(p => p.id === postId);
-        
-        if (post) {
-            post.likes += 1;
-            const success = await updatePosts(posts);
-            if (success) {
-                fetchPosts();
-            }
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('点赞失败，请稍后重试');
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 如果在博客列表页面，加载博客列表
+    if (document.getElementById('blogList')) {
+        loadBlogs();
     }
-}
+});
 
-// 显示评论
-function showComments(postId) {
-    const commentsSection = document.getElementById(`comments-${postId}`);
-    commentsSection.classList.toggle('hidden');
-}
-
-// 添加评论
-async function addComment(event, postId) {
-    event.preventDefault();
-    const input = event.target.querySelector('input');
-    const commentText = input.value;
-    
-    try {
-        const response = await fetch(API_CONFIG.url, {
-            method: 'GET',
-            headers: API_CONFIG.headers
-        });
-        
-        const posts = await response.json();
-        const post = posts.find(p => p.id === postId);
-        
-        if (post) {
-            post.comments.push({
-                text: commentText,
-                date: new Date().toLocaleString()
-            });
-            
-            const success = await updatePosts(posts);
-            if (success) {
-                input.value = '';
-                fetchPosts();
-            }
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('评论失败，请稍后重试');
-    }
-}
-
-// 页面加载时获取文章
-document.addEventListener('DOMContentLoaded', fetchPosts);
