@@ -53,23 +53,25 @@
 <div id="blogModal" class="modal">
     <div class="modal-content">
         <span class="close">&times;</span>
-        <h2 id="modalTitle"></h2>
-        <div id="modalAuthor"></div>
-        <div id="modalContent"></div>
-        <div id="modalDate"></div>
+        <div class="blog-detail">
+            <h2 id="modalTitle"></h2>
+            <div id="modalAuthor"></div>
+            <div id="modalContent"></div>
+            <div id="modalDate"></div>
+        </div>
         
-        <!-- 点赞按钮 -->
+        <!-- 点赞区域 -->
         <div class="like-section">
             <button id="likeBtn" class="btn-like">
-                <span id="likeIcon">❤️</span>
-                <span id="likeCount">0</span>
+                <span class="like-icon">❤️</span>
+                <span class="like-count">0</span>
             </button>
         </div>
 
         <!-- 评论区域 -->
         <div class="comment-section">
             <h3>评论区</h3>
-            <form id="commentForm">
+            <form id="commentForm" class="comment-form">
                 <div class="form-group">
                     <input type="text" id="commentAuthor" placeholder="你的昵称" required>
                 </div>
@@ -78,9 +80,10 @@
                 </div>
                 <button type="submit" class="btn-primary">发表评论</button>
             </form>
-            <div id="commentList"></div>
+            <div id="commentList" class="comment-list"></div>
         </div>
     </div>
+</div>
 </div>
     <footer>
         <p>&copy; 2024 Coverain114514.github.io 博客系统. 保留所有权利。</p>
