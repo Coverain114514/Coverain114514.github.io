@@ -62,8 +62,6 @@ async function handleLike(index, e) {
         alert('点赞操作失败，请重试');
     }
 }
-
-// 修改显示博客详情的函数
 // 修改显示博客列表的函数
 function displayBlogs() {
     const blogList = document.getElementById('blogList');
@@ -72,52 +70,140 @@ function displayBlogs() {
     blogs.forEach((blog, index) => {
         const blogItem = document.createElement('div');
         blogItem.className = 'blog-item';
+        
+        // 修改HTML结构，将评论按钮放在单独的容器中
         blogItem.innerHTML = `
-            <h3 class="blog-title">${blog.title}</h3>
-            <div class="blog-meta">
-                <span>作者: ${blog.author}</span>
-                <div class="action-buttons">
-                    <button class="btn-like" data-index="${index}">
-                        <span class="like-icon">❤️</span>
-                        <span class="like-count">${blog.likes || 0}</span>
-                    </button>
-                    <button class="btn-comment" data-index="${index}">
-                        <span class="comment-icon">💬</span>
-                        <span class="comment-count">${blog.comments?.length || 0}</span>
-                    </button>
+            <div class="blog-content">
+                <h3 class="blog-title">${blog.title}</h3>
+                <div class="blog-meta">
+                    <span>作者: ${blog.author}</span>
                 </div>
+                <p class="blog-preview">${blog.content.substring(0, 100)}...</p>
+                <small>发布时间：${new Date(blog.date).toLocaleString()}</small>
             </div>
-            <p class="blog-preview">${blog.content.substring(0, 100)}...</p>
-            <small>发布时间：${new Date(blog.date).toLocaleString()}</small>
+            <div class="blog-actions">
+                <button class="btn-like" data-index="${index}">
+                    <span class="like-icon">❤️</span>
+                    <span class="like-count">${blog.likes || 0}</span>
+                </button>
+                <button class="btn-comment" data-index="${index}">
+                    <span class="comment-icon">💬</span>
+                    <span class="comment-count">${blog.comments?.length || 0}</span>
+                </button>
+            </div>
         `;
 
-        // 为标题添加点击事件
-        const title = blogItem.querySelector('.blog-title');
-        title.addEventListener('click', () => showBlogDetail(index));
+        // 为博客内容区域添加点击事件
+        const blogContent = blogItem.querySelector('.blog-content');
+        blogContent.addEventListener('click', () => showBlogDetail(index));
 
-        // 为预览文本添加点击事件
-        const preview = blogItem.querySelector('.blog-preview');
-        preview.addEventListener('click', () => showBlogDetail(index));
-
-        // 为点赞按钮添加点击事件
+        // 单独处理点赞按钮
         const likeBtn = blogItem.querySelector('.btn-like');
-        likeBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleLike(index, e);
+        likeBtn.addEventListener('click', async (e) => {
+            e.stopPropagation(); // 阻止事件冒泡
+            await handleLike(index, e);
         });
 
-        // 为评论按钮添加点击事件
+        // 单独处理评论按钮
         const commentBtn = blogItem.querySelector('.btn-comment');
         commentBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showBlogDetail(index, true); // 传入true表示直接跳转到评论区
+            e.stopPropagation(); // 阻止事件冒泡
+            openCommentSection(index);
         });
 
         blogList.appendChild(blogItem);
     });
 }
 
-// 修改显示博客详情的函数
+// 添加新的函数来处理评论区的打开
+function openCommentSection(index) {
+    const modal = document.getElementById('blogModal');
+    currentBlog = blogs[index];
+    
+    // 更新模态框内容
+    document.getElementById('modalTitle').textContent = currentBlog.title;
+    document.getElementById('modalAuthor').textContent = `作者：${currentBlog.author}`;
+    document.getElementById('modalContent').innerHTML = currentBlog.content;
+    document.getElementById('modalDate').textContent = 
+        `发布时间：${new Date(currentBlog.date).toLocaleString()}`;
+    
+    // 显示模态框
+    modal.style.display = 'block';
+    
+    // 加载评论
+    loadComments();
+    
+    // 滚动到评论区并聚焦评论输入框
+    setTimeout(() => {
+        const commentSection = document.querySelector('.comment-section');
+        const commentInput = document.getElementById('commentContent');
+        if (commentSection && commentInput) {
+            commentSection.scrollIntoView({ behavior: 'smooth' });
+            commentInput.focus();
+        }
+    }, 100);
+}
+
+// 更新CSS样式
+const styles = `
+.blog-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 15px;
+    border: 1px solid #ddd;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.blog-content {
+    flex: 1;
+    cursor: pointer;
+}
+
+.blog-actions {
+    display: flex;
+    gap: 10px;
+    margin-left: 15px;
+}
+
+.btn-like,
+.btn-comment {
+    background: none;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.2s;
+}
+
+.btn-like:hover,
+.btn-comment:hover {
+    transform: scale(1.1);
+}
+
+.like-icon,
+.comment-icon {
+    font-size: 1.2em;
+}
+
+.like-count,
+.comment-count {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.blog-preview {
+    margin: 10px 0;
+}
+`;
+
+// 添加样式到页面
+const styleSheet = document.createElement('style');
+styleSheet.textContent = styles;
+document.head.appendChild(styleSheet);
 function showBlogDetail(index, showCommentSection = false) {
     currentBlog = blogs[index];
     const modal = document.getElementById('blogModal');
