@@ -24,44 +24,6 @@ async function loadBlogs() {
 
 // 显示博客列表
 
-
-// 修改处理点赞的函数
-async function handleLike(index, e) {
-    e.preventDefault();
-    const userId = localStorage.getItem('userId') || generateUserId();
-    
-    if (!blogs[index].likedBy) blogs[index].likedBy = [];
-    if (!blogs[index].likes) blogs[index].likes = 0;
-    
-    const isLiked = blogs[index].likedBy.includes(userId);
-    
-    try {
-        if (!isLiked) {
-            blogs[index].likes++;
-            blogs[index].likedBy.push(userId);
-        } else {
-            blogs[index].likes--;
-            blogs[index].likedBy = blogs[index].likedBy.filter(id => id !== userId);
-        }
-        
-        // 更新JSONBin
-        await fetch(`${BASE_URL}/${BIN_ID}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': API_KEY
-            },
-            body: JSON.stringify({ blogs })
-        });
-        
-        // 只更新列表显示，不显示详情
-        displayBlogs();
-        
-    } catch (error) {
-        console.error('点赞失败:', error);
-        alert('点赞操作失败，请重试');
-    }
-}
 // 修改显示博客列表的函数
 function displayBlogs() {
     const blogList = document.getElementById('blogList');
@@ -114,6 +76,134 @@ function displayBlogs() {
         blogList.appendChild(blogItem);
     });
 }
+
+// 添加新的函数来处理评论区的打开
+function openCommentSection(index) {
+    const modal = document.getElementById('blogModal');
+    currentBlog = blogs[index];
+    
+    // 更新模态框内容
+    document.getElementById('modalTitle').textContent = currentBlog.title;
+    document.getElementById('modalAuthor').textContent = `作者：${currentBlog.author}`;
+    document.getElementById('modalContent').innerHTML = currentBlog.content;
+    document.getElementById('modalDate').textContent = 
+        `发布时间：${new Date(currentBlog.date).toLocaleString()}`;
+    
+    // 显示模态框
+    modal.style.display = 'block';
+    
+    // 加载评论
+    loadComments();
+    
+    // 滚动到评论区并聚焦评论输入框
+    setTimeout(() => {
+        const commentSection = document.querySelector('.comment-section');
+        const commentInput = document.getElementById('commentContent');
+        if (commentSection && commentInput) {
+            commentSection.scrollIntoView({ behavior: 'smooth' });
+            commentInput.focus();
+        }
+    }, 100);
+}
+
+// 更新CSS样式
+const styles = `
+.blog-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 15px;
+    border: 1px solid #ddd;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.blog-content {
+    flex: 1;
+    cursor: pointer;
+}
+
+.blog-actions {
+    display: flex;
+    gap: 10px;
+    margin-left: 15px;
+}
+
+.btn-like,
+.btn-comment {
+    background: none;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.2s;
+}
+
+.btn-like:hover,
+.btn-comment:hover {
+    transform: scale(1.1);
+}
+
+.like-icon,
+.comment-icon {
+    font-size: 1.2em;
+}
+
+.like-count,
+.comment-count {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.blog-preview {
+    margin: 10px 0;
+}
+`;
+
+// 添加样式到页面
+const styleSheet = document.createElement('style');
+styleSheet.textContent = styles;
+document.head.appendChild(styleSheet);
+// 修改处理点赞的函数
+async function handleLike(index, e) {
+    e.preventDefault();
+    const userId = localStorage.getItem('userId') || generateUserId();
+    
+    if (!blogs[index].likedBy) blogs[index].likedBy = [];
+    if (!blogs[index].likes) blogs[index].likes = 0;
+    
+    const isLiked = blogs[index].likedBy.includes(userId);
+    
+    try {
+        if (!isLiked) {
+            blogs[index].likes++;
+            blogs[index].likedBy.push(userId);
+        } else {
+            blogs[index].likes--;
+            blogs[index].likedBy = blogs[index].likedBy.filter(id => id !== userId);
+        }
+        
+        // 更新JSONBin
+        await fetch(`${BASE_URL}/${BIN_ID}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': API_KEY
+            },
+            body: JSON.stringify({ blogs })
+        });
+        
+        // 只更新列表显示，不显示详情
+        displayBlogs();
+        
+    } catch (error) {
+        console.error('点赞失败:', error);
+        alert('点赞操作失败，请重试');
+    }
+}
+// 修改显示博客列表的函数
 
 // 添加新的函数来处理评论区的打开
 function openCommentSection(index) {
