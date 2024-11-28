@@ -1,59 +1,43 @@
-.blog-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
+/* 添加加载动画样式 */
+.loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px;
+    text-align: center;
+    z-index: 1000;
+    display: none;
 }
 
-.breadcrumb {
-    padding: 10px 0;
-    margin-bottom: 20px;
-}
-
-.breadcrumb a {
-    color: #007bff;
-    text-decoration: none;
-}
-
-.breadcrumb span {
-    color: #666;
-}
-
-.blog-form {
+/* 博客卡片样式 */
+.blog-card {
     background: white;
     padding: 20px;
+    margin-bottom: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-.form-group {
-    margin-bottom: 20px;
+.blog-meta {
+    color: #666;
+    font-size: 0.9em;
+    margin: 10px 0;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    color: #333;
+.blog-meta span {
+    margin-right: 15px;
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+.blog-content {
+    margin: 15px 0;
+    line-height: 1.6;
 }
 
-.form-actions {
+.blog-actions {
     display: flex;
     gap: 10px;
-    justify-content: flex-end;
 }
 
-.btn-secondary {
-    background-color: #6c757d;
-}
-
-.btn-secondary:hover {
-    background-color: #5a6268;
-}
+/* 保留原有的其他样式 */
