@@ -1,5 +1,53 @@
 /* ������ʽ���� */
 /* 更新基础字体设置 */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 20px;
+    width: 80%;
+    max-width: 800px;
+    border-radius: 8px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+/* 评论区域样式 */
+.comment-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.comment-form {
+    margin: 20px 0;
+}
+
+/* 确保评论区域在模态框中可见 */
+.modal-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.blog-detail {
+    flex: 1;
+}
+
+.comment-section {
+    flex: 1;
+    overflow-y: auto;
+}
 .like-section {
     margin: 20px 0;
     text-align: center;
