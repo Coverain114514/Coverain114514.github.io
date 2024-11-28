@@ -24,53 +24,6 @@ async function loadBlogs() {
 
 // 显示博客列表
 
-function displayBlogs() {
-    const blogList = document.getElementById('blogList');
-    blogList.innerHTML = '';
-    
-    blogs.forEach((blog, index) => {
-        const blogItem = document.createElement('div');
-        blogItem.className = 'blog-item';
-        blogItem.innerHTML = `
-            <h3>${blog.title}</h3>
-            <div class="blog-meta">
-                <span>作者: ${blog.author}</span>
-                <div class="action-buttons">
-                    <button class="btn-like" data-index="${index}">
-                        <span class="like-icon">❤️</span>
-                        <span class="like-count">${blog.likes || 0}</span>
-                    </button>
-                    <button class="btn-comment" data-index="${index}">
-                        <span>💬</span>
-                        <span>${blog.comments?.length || 0}</span>
-                    </button>
-                </div>
-            </div>
-            <p class="blog-preview">${blog.content.substring(0, 100)}...</p>
-            <small>发布时间：${new Date(blog.date).toLocaleString()}</small>
-        `;
-
-        // 为整个博客项添加点击事件（查看详情）
-        blogItem.querySelector('.blog-preview').addEventListener('click', () => showBlogDetail(index));
-        blogItem.querySelector('h3').addEventListener('click', () => showBlogDetail(index));
-
-        // 为点赞按钮添加单独的点击事件
-        const likeBtn = blogItem.querySelector('.btn-like');
-        likeBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // 阻止事件冒泡
-            handleLike(index, e);
-        });
-
-        // 为评论按钮添加单独的点击事件
-        const commentBtn = blogItem.querySelector('.btn-comment');
-        commentBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // 阻止事件冒泡
-            showBlogDetail(index, true); // true 表示直接跳转到评论区
-        });
-
-        blogList.appendChild(blogItem);
-    });
-}
 
 // 修改处理点赞的函数
 async function handleLike(index, e) {
@@ -111,32 +64,121 @@ async function handleLike(index, e) {
 }
 
 // 修改显示博客详情的函数
-function showBlogDetail(index, scrollToComments = false) {
+// 修改显示博客列表的函数
+function displayBlogs() {
+    const blogList = document.getElementById('blogList');
+    blogList.innerHTML = '';
+    
+    blogs.forEach((blog, index) => {
+        const blogItem = document.createElement('div');
+        blogItem.className = 'blog-item';
+        blogItem.innerHTML = `
+            <h3 class="blog-title">${blog.title}</h3>
+            <div class="blog-meta">
+                <span>作者: ${blog.author}</span>
+                <div class="action-buttons">
+                    <button class="btn-like" data-index="${index}">
+                        <span class="like-icon">❤️</span>
+                        <span class="like-count">${blog.likes || 0}</span>
+                    </button>
+                    <button class="btn-comment" data-index="${index}">
+                        <span class="comment-icon">💬</span>
+                        <span class="comment-count">${blog.comments?.length || 0}</span>
+                    </button>
+                </div>
+            </div>
+            <p class="blog-preview">${blog.content.substring(0, 100)}...</p>
+            <small>发布时间：${new Date(blog.date).toLocaleString()}</small>
+        `;
+
+        // 为标题添加点击事件
+        const title = blogItem.querySelector('.blog-title');
+        title.addEventListener('click', () => showBlogDetail(index));
+
+        // 为预览文本添加点击事件
+        const preview = blogItem.querySelector('.blog-preview');
+        preview.addEventListener('click', () => showBlogDetail(index));
+
+        // 为点赞按钮添加点击事件
+        const likeBtn = blogItem.querySelector('.btn-like');
+        likeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleLike(index, e);
+        });
+
+        // 为评论按钮添加点击事件
+        const commentBtn = blogItem.querySelector('.btn-comment');
+        commentBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showBlogDetail(index, true); // 传入true表示直接跳转到评论区
+        });
+
+        blogList.appendChild(blogItem);
+    });
+}
+
+// 修改显示博客详情的函数
+function showBlogDetail(index, showCommentSection = false) {
     currentBlog = blogs[index];
     const modal = document.getElementById('blogModal');
     
+    // 更新模态框内容
     document.getElementById('modalTitle').textContent = currentBlog.title;
     document.getElementById('modalAuthor').textContent = `作者：${currentBlog.author}`;
     document.getElementById('modalContent').innerHTML = currentBlog.content;
     document.getElementById('modalDate').textContent = 
         `发布时间：${new Date(currentBlog.date).toLocaleString()}`;
     
+    // 更新点赞状态
     updateLikeStatus(index);
+    
+    // 加载评论
     loadComments();
     
+    // 显示模态框
     modal.style.display = 'block';
 
-    // 如果需要滚动到评论区
-    if (scrollToComments) {
-        const commentSection = document.querySelector('.comment-section');
-        if (commentSection) {
-            setTimeout(() => {
+    // 如果是从评论按钮点击进来，滚动到评论区
+    if (showCommentSection) {
+        setTimeout(() => {
+            const commentSection = document.querySelector('.comment-section');
+            if (commentSection) {
                 commentSection.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
-        }
+                // 聚焦到评论输入框
+                document.getElementById('commentContent').focus();
+            }
+        }, 100);
     }
 }
-// 添加评论处理函数
+
+// 添加CSS样式
+const style = document.createElement('style');
+style.textContent = `
+    .btn-comment {
+        cursor: pointer;
+        background: none;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        transition: transform 0.2s;
+    }
+
+    .btn-comment:hover {
+        transform: scale(1.1);
+    }
+
+    .comment-icon {
+        font-size: 1.2em;
+    }
+
+    .comment-count {
+        font-size: 0.9em;
+        color: #666;
+    }
+`;
+document.head.appendChild(style);
 async function handleComment(e) {
     e.preventDefault();
     
