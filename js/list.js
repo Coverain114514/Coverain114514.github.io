@@ -26,7 +26,51 @@ async function loadBlogs() {
         document.getElementById('blogList').innerHTML = '<p>加载失败，请刷新页面重试</p>';
     }
 }
+// 添加显示博客详情的函数
+function showBlogDetail(index) {
+    currentBlog = blogs[index];
+    const modal = document.getElementById('blogModal');
+    
+    // 更新模态框内容
+    document.getElementById('modalTitle').textContent = currentBlog.title;
+    document.getElementById('modalAuthor').textContent = `作者：${currentBlog.author}`;
+    document.getElementById('modalContent').innerHTML = currentBlog.content;
+    document.getElementById('modalDate').textContent = 
+        `发布时间：${new Date(currentBlog.date).toLocaleString()}`;
+    
+    // 更新点赞状态
+    updateLikeStatus(index);
+    
+    // 加载评论
+    loadComments();
+    
+    // 显示模态框
+    modal.style.display = 'block';
+}
 
+// 添加更新点赞状态的函数
+function updateLikeStatus(index) {
+    const likeBtn = document.getElementById('modalLikeBtn');
+    const likeCount = likeBtn.querySelector('.like-count');
+    const userId = localStorage.getItem('userId') || generateUserId();
+    
+    // 确保likes和likedBy存在
+    if (!blogs[index].likes) blogs[index].likes = 0;
+    if (!blogs[index].likedBy) blogs[index].likedBy = [];
+    
+    // 更新点赞数量
+    likeCount.textContent = blogs[index].likes;
+    
+    // 更新点赞状态
+    if (blogs[index].likedBy.includes(userId)) {
+        likeBtn.classList.add('liked');
+    } else {
+        likeBtn.classList.remove('liked');
+    }
+}
+
+// 确保HTML中有正确的模态框结构
+// 在list.html中添加或更新以下内容：
 // 显示博客列表
 function displayBlogs() {
     const blogList = document.getElementById('blogList');
