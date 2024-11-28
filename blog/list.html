@@ -71,6 +71,12 @@
         <!-- 评论区域 -->
         <div class="comment-section">
             <h3>评论区</h3>
+            <!-- 在原有模态框之后添加 -->
+<div id="commentModal" class="modal">
+    <div class="modal-content">
+        <span class="close-comment">&times;</span>
+        <h2 id="commentModalTitle"></h2>
+        <div class="comment-section">
             <form id="commentForm" class="comment-form">
                 <div class="form-group">
                     <input type="text" id="commentAuthor" placeholder="你的昵称" required>
@@ -80,6 +86,10 @@
                 </div>
                 <button type="submit" class="btn-primary">发表评论</button>
             </form>
+            <div id="commentList" class="comment-list"></div>
+        </div>
+    </div>
+</div>
             <div id="commentList" class="comment-list"></div>
         </div>
     </div>
