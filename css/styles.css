@@ -1,5 +1,96 @@
 /* ������ʽ���� */
 /* 更新基础字体设置 */
+.blog-item {
+    border: 1px solid #ddd;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.blog-main {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px;
+}
+
+.blog-content {
+    flex: 1;
+    padding-right: 20px;
+}
+
+.blog-actions {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.action-btn-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.btn-like,
+.btn-comment {
+    background: none;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.2s;
+}
+
+.btn-like:hover,
+.btn-comment:hover {
+    transform: scale(1.1);
+}
+
+.like-icon,
+.comment-icon {
+    font-size: 1.2em;
+}
+
+.like-count,
+.comment-count {
+    font-size: 0.8em;
+    color: #666;
+}
+
+.blog-title {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.blog-meta {
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.blog-preview {
+    color: #444;
+    line-height: 1.5;
+    margin: 10px 0;
+}
+
+/* 确保按钮不会继承博客项的点击事件 */
+.btn-like,
+.btn-comment {
+    pointer-events: auto;
+}
+
+.blog-actions {
+    pointer-events: auto;
+}
+
+/* 模态框中的评论区样式 */
+.comment-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
 .modal {
     display: none;
     position: fixed;
