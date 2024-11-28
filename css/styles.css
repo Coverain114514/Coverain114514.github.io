@@ -6,6 +6,136 @@
     border-radius: 4px;
     overflow: hidden;
 }
+/* 添加或更新模态框相关样式 */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 30px;
+    width: 90%;
+    max-width: 800px;
+    border-radius: 8px;
+    position: relative;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.close {
+    position: absolute;
+    right: 20px;
+    top: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #666;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.blog-detail {
+    padding: 20px 0;
+}
+
+.blog-detail h2 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.blog-author {
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.blog-content {
+    line-height: 1.8;
+    color: #444;
+    margin: 20px 0;
+    font-size: 16px;
+}
+
+.blog-date {
+    color: #888;
+    font-size: 0.9em;
+    margin-top: 20px;
+}
+
+/* 点赞按钮样式 */
+.like-section {
+    text-align: center;
+    margin: 20px 0;
+    padding: 10px 0;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+}
+
+.btn-like {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+}
+
+.btn-like.liked .like-icon {
+    color: #ff4444;
+    transform: scale(1.2);
+}
+
+/* 评论区样式 */
+.comment-section {
+    margin-top: 30px;
+}
+
+.comment-form {
+    margin: 20px 0;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    height: 100px;
+    resize: vertical;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        margin: 3% auto;
+        padding: 15px;
+    }
+    
+    .blog-content {
+        font-size: 14px;
+    }
+}
 .blog-item {
     display: flex;
     justify-content: space-between;
