@@ -6,10 +6,10 @@ document.getElementById('blogForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const title = document.getElementById('title').value;
+    const author = document.getElementById('author').value;
     const content = document.getElementById('content').value;
     
     try {
-        // 获取现有博客
         const response = await fetch(`${BASE_URL}/${BIN_ID}/latest`, {
             headers: {
                 'X-Master-Key': API_KEY
@@ -18,14 +18,17 @@ document.getElementById('blogForm').addEventListener('submit', async (e) => {
         const data = await response.json();
         const blogs = data.record.blogs || [];
         
-        // 添加新博客
+        // 添加新博客，包含作者、点赞数和评论数组
         blogs.push({
             title,
+            author,
             content,
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            likes: 0,
+            likedBy: [], // 记录点赞的用户
+            comments: [] // 存储评论
         });
         
-        // 保存更新后的博客列表
         await fetch(`${BASE_URL}/${BIN_ID}`, {
             method: 'PUT',
             headers: {
