@@ -135,3 +135,105 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+function filterBlogs() {
+    const category = document.getElementById('categoryFilter').value;
+    const blogList = document.getElementById('blogList');
+    const blogs = Array.from(blogList.children);
+    
+    blogs.forEach(blog => {
+        const blogCategory = blog.querySelector('.blog-meta').textContent;
+        if (category === 'all' || blogCategory.includes(category)) {
+            blog.style.display = 'block';
+        } else {
+            blog.style.display = 'none';
+        }
+    });
+}
+
+// 显示评论模态框
+function showComments(blogId) {
+    const modal = document.getElementById('commentModal');
+    modal.style.display = 'block';
+    modal.dataset.blogId = blogId;
+    
+    // 加载评论
+    loadComments(blogId);
+}
+
+// 加载评论
+async function loadComments(blogId) {
+    try {
+        const response = await fetch(API_CONFIG.url, {
+            method: 'GET',
+            headers: API_CONFIG.headers
+        });
+        
+        const blogs = await response.json();
+        const blog = blogs.find(b => b.id === blogId);
+        
+        if (blog) {
+            const commentsList = document.getElementById('commentsList');
+            commentsList.innerHTML = blog.comments.map(comment => `
+                <div class="comment">
+                    <p>${comment.text}</p>
+                    <small>${comment.date}</small>
+                </div>
+            `).join('') || '<p>暂无评论</p>';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('加载评论失败');
+    }
+}
+
+// 提交评论
+async function submitComment(event) {
+    event.preventDefault();
+    
+    const modal = document.getElementById('commentModal');
+    const blogId = parseInt(modal.dataset.blogId);
+    const commentText = document.getElementById('commentText').value;
+    
+    try {
+        const response = await fetch(API_CONFIG.url, {
+            method: 'GET',
+            headers: API_CONFIG.headers
+        });
+        
+        const blogs = await response.json();
+        const blog = blogs.find(b => b.id === blogId);
+        
+        if (blog) {
+            blog.comments.push({
+                text: commentText,
+                date: new Date().toLocaleString()
+            });
+            
+            await fetch(API_CONFIG.url, {
+                method: 'PUT',
+                headers: API_CONFIG.headers,
+                body: JSON.stringify(blogs)
+            });
+            
+            // 重新加载评论
+            loadComments(blogId);
+            document.getElementById('commentText').value = '';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('提交评论失败');
+    }
+}
+
+// 关闭模态框
+document.querySelector('.close').onclick = function() {
+    document.getElementById('commentModal').style.display = 'none';
+}
+
+// 点击模态框外部关闭
+window.onclick = function(event) {
+    const modal = document.getElementById('commentModal');
+    if (event.target === modal) {
+        modal.style.display = 'none';
+    }
+}
