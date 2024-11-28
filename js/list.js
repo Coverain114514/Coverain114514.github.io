@@ -136,7 +136,103 @@ function showBlogDetail(index, scrollToComments = false) {
         }
     }
 }
+// 添加评论处理函数
+async function handleComment(e) {
+    e.preventDefault();
+    
+    const commentAuthor = document.getElementById('commentAuthor').value;
+    const commentContent = document.getElementById('commentContent').value;
+    
+    if (!commentAuthor.trim() || !commentContent.trim()) {
+        alert('请填写昵称和评论内容');
+        return;
+    }
+    
+    // 找到当前博客在数组中的索引
+    const blogIndex = blogs.findIndex(b => b.date === currentBlog.date);
+    
+    // 初始化评论数组
+    if (!blogs[blogIndex].comments) {
+        blogs[blogIndex].comments = [];
+    }
+    
+    // 创建新评论
+    const newComment = {
+        author: commentAuthor,
+        content: commentContent,
+        date: new Date().toISOString()
+    };
+    
+    try {
+        // 添加新评论
+        blogs[blogIndex].comments.push(newComment);
+        
+        // 更新JSONBin
+        await fetch(`${BASE_URL}/${BIN_ID}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': API_KEY
+            },
+            body: JSON.stringify({ blogs })
+        });
+        
+        // 更新当前博客对象
+        currentBlog = blogs[blogIndex];
+        
+        // 重新加载评论列表
+        loadComments();
+        
+        // 清空评论表单
+        document.getElementById('commentForm').reset();
+        
+        // 更新博客列表显示
+        displayBlogs();
+        
+        alert('评论发表成功！');
+        
+    } catch (error) {
+        console.error('评论提交失败:', error);
+        alert('评论提交失败，请重试');
+    }
+}
 
+// 加载评论列表
+function loadComments() {
+    const commentList = document.getElementById('commentList');
+    commentList.innerHTML = '';
+    
+    if (!currentBlog.comments) {
+        currentBlog.comments = [];
+    }
+    
+    if (currentBlog.comments.length === 0) {
+        commentList.innerHTML = '<div class="no-comments">暂无评论，来发表第一条评论吧！</div>';
+        return;
+    }
+    
+    currentBlog.comments.forEach(comment => {
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'comment-item';
+        commentDiv.innerHTML = `
+            <div class="comment-author">${comment.author}</div>
+            <div class="comment-content">${comment.content}</div>
+            <div class="comment-date">${new Date(comment.date).toLocaleString()}</div>
+        `;
+        commentList.appendChild(commentDiv);
+    });
+}
+
+// 修改初始化事件监听器函数
+function initializeEventListeners() {
+    // ... 其他事件监听器保持不变 ...
+
+    // 评论表单提交事件
+    const commentForm = document.getElementById('commentForm');
+    if (commentForm) {
+        commentForm.addEventListener('submit', handleComment);
+    }
+}
 // 更新点赞状态的函数
 function updateLikeStatus() {
     const likeBtn = document.getElementById('likeBtn');
@@ -204,82 +300,6 @@ async function initialize() {
 
 // 确保在页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', initialize);
-// 加载评论列表
-function loadComments() {
-    const commentList = document.getElementById('commentList');
-    commentList.innerHTML = '';
-    
-    if (!currentBlog.comments) {
-        currentBlog.comments = [];
-    }
-    
-    currentBlog.comments.forEach(comment => {
-        const commentDiv = document.createElement('div');
-        commentDiv.className = 'comment-item';
-        commentDiv.innerHTML = `
-            <div class="comment-author">${comment.author}</div>
-            <div class="comment-content">${comment.content}</div>
-            <div class="comment-date">${new Date(comment.date).toLocaleString()}</div>
-        `;
-        commentList.appendChild(commentDiv);
-    });
-}
-    
-// 修改后的评论处理函数
-async function handleComment(e) {
-    e.preventDefault();
-    
-    const commentAuthor = document.getElementById('commentAuthor').value;
-    const commentContent = document.getElementById('commentContent').value;
-    
-    if (!commentAuthor.trim() || !commentContent.trim()) {
-        alert('请填写昵称和评论内容');
-        return;
-    }
-    
-    // 找到当前博客在数组中的索引
-    const blogIndex = blogs.findIndex(b => b.date === currentBlog.date);
-    
-    // 初始化评论数组
-    if (!blogs[blogIndex].comments) {
-        blogs[blogIndex].comments = [];
-    }
-    
-    const newComment = {
-        author: commentAuthor,
-        content: commentContent,
-        date: new Date().toISOString()
-    };
-    
-    blogs[blogIndex].comments.push(newComment);
-    
-    try {
-        // 更新JSONBin
-        await fetch(`${BASE_URL}/${BIN_ID}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Master-Key': API_KEY
-            },
-            body: JSON.stringify({ blogs })
-        });
-        
-        // 更新当前博客对象
-        currentBlog = blogs[blogIndex];
-        // 更新UI
-        loadComments();
-        // 清空表单
-        document.getElementById('commentForm').reset();
-        // 刷新列表显示
-        displayBlogs();
-        
-    } catch (error) {
-        console.error('评论提交失败:', error);
-        alert('评论提交失败，请重试');
-    }
-}
-
-// 修改事件监听器的绑定方式
 function initializeEventListeners() {
     // 点赞按钮事件
     document.getElementById('likeBtn').onclick = handleLike;
