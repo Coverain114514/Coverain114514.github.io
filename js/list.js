@@ -4,7 +4,87 @@ const BASE_URL = 'https://api.jsonbin.io/v3/b';
 
 let currentBlog = null;
 let blogs = [];
+function displayBlogs() {
+    const blogList = document.getElementById('blogList');
+    blogList.innerHTML = '';
+    
+    blogs.forEach((blog, index) => {
+        const blogItem = document.createElement('div');
+        blogItem.className = 'blog-item';
+        
+        blogItem.innerHTML = `
+            <div class="blog-content">
+                <h3>${blog.title}</h3>
+                <div class="blog-meta">
+                    <span>作者: ${blog.author}</span>
+                </div>
+                <p class="blog-preview">${blog.content.substring(0, 100)}...</p>
+                <small>发布时间：${new Date(blog.date).toLocaleString()}</small>
+            </div>
+            <div class="blog-actions">
+                <button class="btn-like">
+                    <span class="like-icon">❤️</span>
+                    <span class="like-count">${blog.likes || 0}</span>
+                </button>
+                <button class="btn-comment">
+                    <span class="comment-icon">💬</span>
+                    <span class="comment-count">${blog.comments?.length || 0}</span>
+                </button>
+            </div>
+        `;
 
+        // 为整个博客项添加点击事件
+        blogItem.querySelector('.blog-content').addEventListener('click', () => {
+            openBlogDetail(index);
+        });
+
+        blogList.appendChild(blogItem);
+    });
+}
+
+// 添加新的博客详情显示函数
+function openBlogDetail(index) {
+    console.log('Opening blog detail for index:', index); // 调试日志
+    
+    const blog = blogs[index];
+    const modal = document.getElementById('blogDetailModal');
+    
+    // 更新模态框内容
+    document.getElementById('detailTitle').textContent = blog.title;
+    document.getElementById('detailAuthor').textContent = `作者：${blog.author}`;
+    document.getElementById('detailContent').innerHTML = blog.content;
+    document.getElementById('detailDate').textContent = 
+        `发布时间：${new Date(blog.date).toLocaleString()}`;
+    
+    // 显示模态框
+    modal.style.display = 'block';
+}
+
+// 初始化事件监听器
+function initializeEventListeners() {
+    // 关闭按钮事件
+    const closeBtn = document.querySelector('.close');
+    if (closeBtn) {
+        closeBtn.onclick = function() {
+            document.getElementById('blogDetailModal').style.display = 'none';
+        }
+    }
+    
+    // 点击模态框外部关闭
+    window.onclick = function(event) {
+        const modal = document.getElementById('blogDetailModal');
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+}
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Page loaded'); // 调试日志
+    loadBlogs();
+    initializeEventListeners();
+});
 // 从JSONBin加载博客数据
 async function loadBlogs() {
     try {
