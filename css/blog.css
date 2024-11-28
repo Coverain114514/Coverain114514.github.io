@@ -1,4 +1,45 @@
 /* 添加加载动画样式 */
+/* 修改点赞按钮相关样式 */
+.like-section {
+    text-align: center;
+    margin: 20px 0;
+    padding: 10px 0;
+}
+
+.btn-like {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.like-icon {
+    font-size: 24px;
+    color: #ccc;
+    transition: all 0.3s ease;
+}
+
+.btn-like.liked .like-icon {
+    color: #ff4444;
+    transform: scale(1.2);
+}
+
+.like-count {
+    font-size: 16px;
+    color: #666;
+}
+
+.btn-like:hover .like-icon {
+    transform: scale(1.1);
+}
+
+.btn-like.liked:hover .like-icon {
+    transform: scale(1.3);
+}
 .loading {
     position: fixed;
     top: 0;
