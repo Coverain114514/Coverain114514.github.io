@@ -1,6 +1,6 @@
 ﻿// JSONBin 配置
-const API_KEY = '$2a$10$2c.KEwI3Qk9vXM5hHUzqN.CvY7x3z5vNXqP3FGxO9f.MFQGiNzuGi'; // 替换成你的 API Key
-const BIN_ID = '65f7c43ddc74654018a8d1a4'; // 替换成你的 Bin ID
+const API_KEY = '$2a$10$nX0PT8wbblMuHpGyw.iCWOwHCuzlcqdZBy9A8BjmEvyCpGrWm7Eay'; // 替换成你的 API Key
+const BIN_ID = '67482f7fad19ca34f8d1df3a'; // 替换成你的 Bin ID
 const BASE_URL = 'https://api.jsonbin.io/v3/b';
 
 let messages = [];
