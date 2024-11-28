@@ -8,119 +8,45 @@
     <link rel="stylesheet" href="../css/blog.css">
 </head>
 <body>
-    <div id="loading" class="loading">加载中...</div>
-
-    <header>
-         <nav class="navbar">
-        <div class="logo">网站Logo</div>
-        <ul class="nav-links">
-            <li><a href="../index.html">首页</a></li>
-            <li><a href="../about.html">关于Coverain</a></li>
-            <li><a href="../services.html">服务</a></li>
-            <li><a href="#contact">联系Coverain</a></li>
-        </ul>
-    </nav>
-        
-        <div class="breadcrumb">
-            <a href="../index.html">首页</a> >
-            <a href="../services.html">服务</a> >
-            <span>博客列表</span>
-        </div>
-    </header>
-
     <div class="container">
         <header>
             <h1>博客列表</h1>
-            <nav>
-                <a href="write.html" class="btn">写博客</a>
-            </nav>
         </header>
 
-        <div id="blogList" class="blog-list"></div>
+        <main id="blogList" class="blog-list">
+            <!-- 博客列表将通过 JavaScript 动态加载 -->
+        </main>
 
-        <!-- 博客详情弹窗 -->
         <!-- 博客详情模态框 -->
         <div id="blogModal" class="modal">
-        <div class="modal-content">
-        <span class="close">&times;</span>
-        <div class="blog-detail">
-            <h2 id="modalTitle"></h2>
-            <div id="modalAuthor" class="blog-author"></div>
-            <div id="modalContent" class="blog-content"></div>
-            <div id="modalDate" class="blog-date"></div>
-            
-            <!-- 点赞区域 -->
-            <div class="like-section">
-                <button id="modalLikeBtn" class="btn-like">
-                    <span class="like-icon">❤️</span>
-                    <span class="like-count">0</span>
-                </button>
-            </div>
-            
-            <!-- 评论区域 -->
-            <div class="comment-section">
-                <h3>评论区</h3>
-                <form id="commentForm" class="comment-form">
-                    <div class="form-group">
-                        <input type="text" id="commentAuthor" placeholder="你的昵称" required>
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <article class="blog-detail">
+                    <h2 id="modalTitle"></h2>
+                    <div id="modalAuthor" class="author"></div>
+                    <div id="modalDate" class="date"></div>
+                    <div id="modalContent" class="content"></div>
+                    
+                    <div class="interaction-section">
+                        <button id="likeBtn" class="btn-like">
+                            <span class="like-icon">❤️</span>
+                            <span class="like-count">0</span>
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <textarea id="commentContent" placeholder="写下你的评论..." required></textarea>
-                    </div>
-                    <button type="submit" class="btn-primary">发表评论</button>
-                </form>
-                <div id="commentList" class="comment-list"></div>
-            </div>
-        </div>
-    </div>
-</div>
-    </div>
-    <!-- ... 前面的代码保持不变 ... -->
-<div id="blogModal" class="modal">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <div class="blog-detail">
-            <h2 id="modalTitle"></h2>
-            <div id="modalAuthor"></div>
-            <div id="modalContent"></div>
-            <div id="modalDate"></div>
-        </div>
-        
-        <!-- 点赞区域 -->
-        <div class="like-section">
-            <button id="likeBtn" class="btn-like">
-                <span class="like-icon">❤️</span>
-                <span class="like-count">0</span>
-            </button>
-        </div>
 
-        <!-- 评论区域 -->
-        <div class="comment-section">
-            <h3>评论区</h3>
-            <!-- 在原有模态框之后添加 -->
-<div id="commentModal" class="modal">
-    <div class="modal-content">
-        <span class="close-comment">&times;</span>
-        <h2 id="commentModalTitle"></h2>
-        <div class="comment-section">
-            <form id="commentForm" class="comment-form">
-                <div class="form-group">
-                    <input type="text" id="commentAuthor" placeholder="你的昵称" required>
-                </div>
-                <div class="form-group">
-                    <textarea id="commentContent" placeholder="写下你的评论..." required></textarea>
-                </div>
-                <button type="submit" class="btn-primary">发表评论</button>
-            </form>
-            <div id="commentList" class="comment-list"></div>
+                    <div class="comment-section">
+                        <h3>评论区</h3>
+                        <form id="commentForm">
+                            <input type="text" id="commentAuthor" placeholder="你的昵称" required>
+                            <textarea id="commentContent" placeholder="写下你的评论..." required></textarea>
+                            <button type="submit" class="btn-submit">发表评论</button>
+                        </form>
+                        <div id="commentList"></div>
+                    </div>
+                </article>
+            </div>
         </div>
     </div>
-</div>
-            <div id="commentList" class="comment-list"></div>
-        </div>
-    </div>
-</div>
-</div>
     <footer>
         <p>&copy; 2024 Coverain114514.github.io 博客系统. 保留所有权利。</p>
     </footer>
