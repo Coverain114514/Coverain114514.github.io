@@ -61,7 +61,12 @@ function displayBlogs() {
         `;
         
         // 创建评论按钮
-        
+        const commentBtn = document.createElement('button');
+        commentBtn.className = 'btn-comment';
+        commentBtn.innerHTML = `
+            <span class="comment-icon">💬</span>
+            <span class="comment-count">${blog.comments?.length || 0}</span>
+        `;
         
         // 添加点击事件
         contentDiv.onclick = () => showBlogDetail(index);
