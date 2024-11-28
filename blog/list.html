@@ -28,43 +28,30 @@
         </div>
     </header>
 
-    <main class="blog-container">
-        <div class="blog-header">
+    <div class="container">
+        <header>
             <h1>博客列表</h1>
-            <div class="blog-actions">
-                <a href="write.html" class="btn">写新博客</a>
-                <select id="categoryFilter" onchange="filterBlogs()">
-                    <option value="all">所有分类</option>
-                    <option value="tech">技术</option>
-                    <option value="life">生活</option>
-                    <option value="other">其他</option>
-                </select>
-            </div>
-        </div>
+            <nav>
+                <a href="write.html" class="btn">写博客</a>
+            </nav>
+        </header>
 
-        <!-- 博客列表容器 -->
-        <div id="blogList" class="blog-list">
-            <!-- 博客将通过 JavaScript 动态加载 -->
-        </div>
+        <div id="blogList" class="blog-list"></div>
 
-        <!-- 评论模态框 -->
-        <div id="commentModal" class="modal">
+        <!-- 博客详情弹窗 -->
+        <div id="blogModal" class="modal">
             <div class="modal-content">
                 <span class="close">&times;</span>
-                <h2>评论</h2>
-                <div id="commentsList"></div>
-                <form id="commentForm" onsubmit="submitComment(event)">
-                    <textarea id="commentText" required placeholder="写下你的评论..."></textarea>
-                    <button type="submit" class="btn">发表评论</button>
-                </form>
+                <h2 id="modalTitle"></h2>
+                <div id="modalContent"></div>
+                <div id="modalDate"></div>
             </div>
         </div>
-    </main>
-
+    </div>
     <footer>
         <p>&copy; 2024 博客系统. 保留所有权利。</p>
     </footer>
 
-    <script src="../js/blog.js"></script>
+    <script src="../js/list.js"></script>
 </body>
 </html>
