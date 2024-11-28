@@ -1,0 +1,55 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>留言板</title>
+    <link rel="stylesheet" href="message.css">
+</head>
+<body>
+<nav class="navbar">
+        <div class="logo">网站Logo</div>
+        <ul class="nav-links">
+            <li><a href="../index.html">首页</a></li>
+            <li><a href="../about.html">关于Coverain</a></li>
+            <li><a href="../services.html">服务</a></li>
+            <li><a href="#contact">联系Coverain</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        <header>
+            <h1>留言板</h1>
+            <a href="list.html" class="back-btn">返回博客列表</a>
+        </header>
+
+        <!-- 留言表单 -->
+        <section class="message-form-section">
+            <form id="messageForm" class="message-form">
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="isAnonymous"> 
+                        匿名留言
+                    </label>
+                </div>
+                <div class="form-group" id="nameGroup">
+                    <input type="text" id="authorName" 
+                           placeholder="你的昵称" required>
+                </div>
+                <div class="form-group">
+                    <textarea id="messageContent" 
+                            placeholder="写下你的留言..." required></textarea>
+                </div>
+                <button type="submit" class="submit-btn">发表留言</button>
+            </form>
+        </section>
+
+        <!-- 留言列表 -->
+        <section class="message-list-section">
+            <h2>留言列表</h2>
+            <div id="messageList" class="message-list">
+                <!-- 留言将通过JavaScript动态加载 -->
+            </div>
+        </section>
+    </div>
+    <script src="../js/message.js"></script>
+</body>
+</html>
