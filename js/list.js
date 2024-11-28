@@ -3,7 +3,6 @@ const BIN_ID = '6747cfdeacd3cb34a8b03128';
 const BASE_URL = 'https://api.jsonbin.io/v3/b';
 let currentBlog = null;
 let blogs = [];
-
 // 加载博客列表
 async function loadBlogs() {
     try {
@@ -21,12 +20,113 @@ async function loadBlogs() {
         document.getElementById('blogList').innerHTML = '<p>加载失败，请刷新页面重试</p>';
     }
 }
+function displayBlogs() {
+    const blogList = document.getElementById('blogList');
+    blogList.innerHTML = '';
+    
+    blogs.forEach((blog, index) => {
+        const blogItem = document.createElement('div');
+        blogItem.className = 'blog-item';
+        
+        // 创建博客内容
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'blog-content';
+        contentDiv.innerHTML = `
+            <h3 class="blog-title">${blog.title}</h3>
+            <div class="blog-meta">
+                <span>作者: ${blog.author}</span>
+            </div>
+            <p class="blog-preview">${blog.content.substring(0, 100)}...</p>
+            <small>发布时间：${new Date(blog.date).toLocaleString()}</small>
+        `;
+        
+        // 创建操作按钮容器
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'blog-actions';
+        
+        // 创建点赞按钮
+        const likeBtn = document.createElement('button');
+        likeBtn.className = 'btn-like';
+        likeBtn.innerHTML = `
+            <span class="like-icon">❤️</span>
+            <span class="like-count">${blog.likes || 0}</span>
+        `;
+        
+        // 创建评论按钮
+        const commentBtn = document.createElement('button');
+        commentBtn.className = 'btn-comment';
+        commentBtn.innerHTML = `
+            <span class="comment-icon">💬</span>
+            <span class="comment-count">${blog.comments?.length || 0}</span>
+        `;
+        
+        // 添加点击事件
+        contentDiv.onclick = () => showBlogDetail(index);
+        
+        likeBtn.onclick = (e) => {
+            e.stopPropagation();
+            handleLike(index);
+        };
+        
+        commentBtn.onclick = (e) => {
+            e.stopPropagation();
+            openCommentModal(index);
+            return false;
+        };
+        
+        // 组装DOM
+        actionsDiv.appendChild(likeBtn);
+        actionsDiv.appendChild(commentBtn);
+        blogItem.appendChild(contentDiv);
+        blogItem.appendChild(actionsDiv);
+        blogList.appendChild(blogItem);
+    });
+}
 
-// 显示博客列表
+// 打开评论模态框
+function openCommentModal(index) {
+    currentBlog = blogs[index];
+    const commentModal = document.getElementById('commentModal');
+    
+    // 设置标题
+    document.getElementById('commentModalTitle').textContent = `评论: ${currentBlog.title}`;
+    
+    // 加载评论
+    loadComments();
+    
+    // 显示模态框
+    commentModal.style.display = 'block';
+    
+    // 聚焦到评论输入框
+    document.getElementById('commentContent').focus();
+}
 
-// 修改显示博客列表的函数
+// 加载评论列表
+function loadComments() {
+    const commentList = document.getElementById('commentList');
+    commentList.innerHTML = '';
+    
+    if (!currentBlog.comments) {
+        currentBlog.comments = [];
+    }
+    
+    if (currentBlog.comments.length === 0) {
+        commentList.innerHTML = '<div class="no-comments">暂无评论，来发表第一条评论吧！</div>';
+        return;
+    }
+    
+    currentBlog.comments.forEach(comment => {
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'comment-item';
+        commentDiv.innerHTML = `
+            <div class="comment-author">${comment.author}</div>
+            <div class="comment-content">${comment.content}</div>
+            <div class="comment-date">${new Date(comment.date).toLocaleString()}</div>
+        `;
+        commentList.appendChild(commentDiv);
+    });
+}
 
-// 添加新的函数来处理评论区的打开
 function openCommentSection(index) {
     const modal = document.getElementById('blogModal');
     currentBlog = blogs[index];
@@ -456,43 +556,6 @@ async function handleComment(e) {
     }
 }
 
-// 加载评论列表
-function loadComments() {
-    const commentList = document.getElementById('commentList');
-    commentList.innerHTML = '';
-    
-    if (!currentBlog.comments) {
-        currentBlog.comments = [];
-    }
-    
-    if (currentBlog.comments.length === 0) {
-        commentList.innerHTML = '<div class="no-comments">暂无评论，来发表第一条评论吧！</div>';
-        return;
-    }
-    
-    currentBlog.comments.forEach(comment => {
-        const commentDiv = document.createElement('div');
-        commentDiv.className = 'comment-item';
-        commentDiv.innerHTML = `
-            <div class="comment-author">${comment.author}</div>
-            <div class="comment-content">${comment.content}</div>
-            <div class="comment-date">${new Date(comment.date).toLocaleString()}</div>
-        `;
-        commentList.appendChild(commentDiv);
-    });
-}
-
-// 修改初始化事件监听器函数
-function initializeEventListeners() {
-    // ... 其他事件监听器保持不变 ...
-
-    // 评论表单提交事件
-    const commentForm = document.getElementById('commentForm');
-    if (commentForm) {
-        commentForm.addEventListener('submit', handleComment);
-    }
-}
-// 更新点赞状态的函数
 function updateLikeStatus() {
     const likeBtn = document.getElementById('likeBtn');
     const likeCount = likeBtn.querySelector('.like-count');
@@ -525,26 +588,23 @@ function initializeEventListeners() {
     }
     
     // 评论表单提交事件
-    const commentForm = document.getElementById('commentForm');
-    if (commentForm) {
-        commentForm.addEventListener('submit', handleComment);
-    }
+    document.getElementById('commentForm').onsubmit = async (e) => {
+        e.preventDefault();
+        await handleComment();
+    };
     
-    // 关闭模态框
-    const closeBtn = document.querySelector('.close');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            document.getElementById('blogModal').style.display = 'none';
-        });
-    }
+    // 关闭评论模态框
+    document.querySelector('.close-comment').onclick = () => {
+        document.getElementById('commentModal').style.display = 'none';
+    };
     
     // 点击模态框外部关闭
-    window.addEventListener('click', (event) => {
-        const modal = document.getElementById('blogModal');
-        if (event.target === modal) {
-            modal.style.display = 'none';
+    window.onclick = (event) => {
+        const commentModal = document.getElementById('commentModal');
+        if (event.target === commentModal) {
+            commentModal.style.display = 'none';
         }
-    });
+    };
 }
 
 // 页面加载时初始化
