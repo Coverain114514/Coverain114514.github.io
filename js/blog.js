@@ -3,7 +3,7 @@ const API_CONFIG = {
     url: 'https://api.jsonbin.io/v3/b/6747cfdeacd3cb34a8b03128', // 替换为你的 BIN ID
     headers: {
         'Content-Type': 'application/json',
-        'X-Master-Key': '$2a$10$ZfWNgnKO6UkPdcgrP./iwOCZEhJhmid0yXdRIMJgp9GQT307tbJ9G', // 替换为你的 API KEY
+        'X-Master-Key': '$2a$10$nX0PT8wbblMuHpGyw.iCWOwHCuzlcqdZBy9A8BjmEvyCpGrWm7Eay', // 替换为你的 API KEY
         'X-Bin-Meta': false
     }
 };
