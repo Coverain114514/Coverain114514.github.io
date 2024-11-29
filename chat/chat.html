@@ -314,7 +314,88 @@
             setInterval(fetchLatestData, 2000);  // 每秒更新一次数据
             setInterval(heartbeat, 5000);        // 每5秒发送一次心跳
         }
+        // 修改 beforeunload 事件处理
+window.addEventListener('beforeunload', function(e) {
+    // 发送同步请求确保在页面关闭前完成
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, false); // 同步请求
+    xhr.setRequestHeader('X-Master-Key', API_KEY);
+    xhr.send();
+    
+    if (xhr.status === 200) {
+        const data = JSON.parse(xhr.responseText);
+        let currentData = data.record;
+        
+        // 移除用户
+        currentData.onlineUsers = currentData.onlineUsers.filter(user => user !== nickname);
+        delete currentData.userHeartbeats[nickname];
+        
+        // 添加退出消息
+        currentData.messages.push({
+            type: 'system',
+            content: `${nickname} 离开了聊天室`,
+            timestamp: Date.now()
+        });
 
+        // 同步发送更新请求
+        const updateXhr = new XMLHttpRequest();
+        updateXhr.open('PUT', `https://api.jsonbin.io/v3/b/${BIN_ID}`, false);
+        updateXhr.setRequestHeader('Content-Type', 'application/json');
+        updateXhr.setRequestHeader('X-Master-Key', API_KEY);
+        updateXhr.send(JSON.stringify(currentData));
+    }
+});
+
+// 添加 visibilitychange 事件处理
+document.addEventListener('visibilitychange', async function() {
+    if (document.visibilityState === 'hidden') {
+        try {
+            const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                headers: {
+                    'X-Master-Key': API_KEY
+                }
+            });
+            
+            if (!response.ok) throw new Error('获取数据失败');
+            
+            const data = await response.json();
+            let currentData = data.record;
+            
+            // 移除用户
+            currentData.onlineUsers = currentData.onlineUsers.filter(user => user !== nickname);
+            delete currentData.userHeartbeats[nickname];
+            
+            // 添加退出消息
+            currentData.messages.push({
+                type: 'system',
+                content: `${nickname} 离开了聊天室`,
+                timestamp: Date.now()
+            });
+
+            // 更新数据
+            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': API_KEY
+                },
+                body: JSON.stringify(currentData)
+            });
+        } catch (error) {
+            console.error('退出错误:', error);
+        }
+    }
+});
+
+// 添加页面卸载事件处理
+window.addEventListener('unload', function() {
+    // 发送信标请求
+    navigator.sendBeacon(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, JSON.stringify({
+        type: 'userExit',
+        nickname: nickname,
+        timestamp: Date.now()
+    }));
+});
         // 监听Enter键发送消息
         document.getElementById('messageInput')?.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
