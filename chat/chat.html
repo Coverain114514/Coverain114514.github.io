@@ -311,8 +311,8 @@
 
         // 开始轮询
         function startPolling() {
-            setInterval(fetchLatestData, 10000);  // 每秒更新一次数据
-            setInterval(heartbeat, 50000);        // 每5秒发送一次心跳
+            setInterval(fetchLatestData, 2000);  // 每秒更新一次数据
+            setInterval(heartbeat, 5000);        // 每5秒发送一次心跳
         }
 
         // 监听Enter键发送消息
