@@ -1,0 +1,296 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>喵喵喵</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        #userList {
+            width: 200px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .chat-container {
+            flex-grow: 1;
+        }
+        #chatBox {
+            height: 350px;
+            border: 1px solid #ccc;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+        #messageInput {
+            width: 80%;
+            padding: 8px;
+            margin-right: 10px;
+        }
+        #sendButton {
+            width: 15%;
+            padding: 8px;
+        }
+        .hidden {
+            display: none;
+        }
+        .system-message {
+            color: #666;
+            font-style: italic;
+        }
+        .timestamp {
+            color: #999;
+            font-size: 0.8em;
+            margin-right: 5px;
+        }
+        .user-list-item {
+            padding: 5px;
+            margin: 2px 0;
+            background-color: #f0f0f0;
+            border-radius: 3px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .message:nth-child(odd) {
+            background-color: #f8f8f8;
+        }
+    </style>
+    <link rel="shortcut icon" href="114514.ico">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">网站Logo</div>
+        <ul class="nav-links">
+            <li><a href="../index.html">首页</a></li>
+            <li><a href="../about.html">关于Coverain</a></li>
+            <li><a href="../services.html">服务</a></li>
+            <li><a href="../contact.html">联系Coverain</a></li>
+        </ul>
+    </nav>
+
+    <!-- 登录界面 -->
+    <div id="loginScreen">
+        <h2>进入聊天室</h2>
+        <input type="text" id="nicknameInput" placeholder="输入昵称">
+        <button onclick="login()">进入</button>
+    </div>
+
+    <!-- 聊天界面 -->
+    <div id="chatScreen" class="hidden">
+        <h2>聊天室</h2>
+        <div class="container">
+            <div id="userList">
+                <h3>在线用户</h3>
+                <div id="userListContent"></div>
+            </div>
+            <div class="chat-container">
+                <div id="chatBox"></div>
+                <input type="text" id="messageInput" placeholder="输入消息">
+                <button id="sendButton" onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // JSONbin配置
+        const BIN_ID = '你的JSONBIN_ID';
+        const API_KEY = '你的API_KEY';
+        
+        let nickname = '';
+        let lastMessageTime = Date.now();
+        let messages = [];
+        let onlineUsers = new Set();
+        let lastActivityTime = {};
+
+        // 格式化时间
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        }
+
+        // 登录函数
+        async function login() {
+            nickname = document.getElementById('nicknameInput').value.trim();
+            if (nickname) {
+                if (onlineUsers.has(nickname)) {
+                    alert('该昵称已被使用');
+                    return;
+                }
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('chatScreen').classList.remove('hidden');
+                await addSystemMessage(`${nickname} 加入了聊天室`);
+                onlineUsers.add(nickname);
+                updateUserList();
+                startPolling();
+                window.addEventListener('beforeunload', handleUserExit);
+            } else {
+                alert('请输入昵称');
+            }
+        }
+
+        // 处理用户退出
+        async function handleUserExit() {
+            await addSystemMessage(`${nickname} 离开了聊天室`);
+            onlineUsers.delete(nickname);
+            updateUserList();
+        }
+
+        // 添加系统消息
+        async function addSystemMessage(content) {
+            const systemMessage = {
+                type: 'system',
+                content: content,
+                timestamp: Date.now()
+            };
+            messages.push(systemMessage);
+            await updateJSONbin();
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (message) {
+                const newMessage = {
+                    type: 'user',
+                    nickname: nickname,
+                    content: message,
+                    timestamp: Date.now()
+                };
+
+                messages.push(newMessage);
+                await updateJSONbin();
+                messageInput.value = '';
+                lastMessageTime = Date.now();
+                lastActivityTime[nickname] = Date.now();
+            }
+        }
+
+        // 更新用户列表
+        function updateUserList() {
+            const userListContent = document.getElementById('userListContent');
+            userListContent.innerHTML = Array.from(onlineUsers)
+                .map(user => `<div class="user-list-item">${user}</div>`)
+                .join('');
+        }
+
+        // 更新JSONbin
+        async function updateJSONbin() {
+            try {
+                const data = {
+                    messages: messages,
+                    onlineUsers: Array.from(onlineUsers)
+                };
+                
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('更新失败');
+                }
+            } catch (error) {
+                console.error('更新错误:', error);
+            }
+        }
+
+        // 获取消息和用户列表
+        async function getMessages() {
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: {
+                        'X-Master-Key': API_KEY
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.record) {
+                        messages = data.record.messages || [];
+                        onlineUsers = new Set(data.record.onlineUsers || []);
+                        updateChatBox();
+                        updateUserList();
+                    }
+                }
+            } catch (error) {
+                console.error('获取消息错误:', error);
+            }
+        }
+
+        // 更新聊天框
+        function updateChatBox() {
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML = messages.map(msg => {
+                if (msg.type === 'system') {
+                    return `
+                        <div class="message system-message">
+                            <span class="timestamp">${formatTime(msg.timestamp)}</span>
+                            ${msg.content}
+                        </div>`;
+                } else {
+                    return `
+                        <div class="message">
+                            <span class="timestamp">${formatTime(msg.timestamp)}</span>
+                            <strong>${msg.nickname}:</strong> ${msg.content}
+                        </div>`;
+                }
+            }).join('');
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // 清理旧消息和离线用户
+        async function cleanOldMessages() {
+            const currentTime = Date.now();
+            const timeout = 30000; // 30秒超时
+
+            // 清理旧消息
+            if (currentTime - lastMessageTime > timeout) {
+                messages = [];
+                await updateJSONbin();
+            }
+
+            // 清理离线用户
+            for (const user of onlineUsers) {
+                if (currentTime - (lastActivityTime[user] || 0) > timeout) {
+                    onlineUsers.delete(user);
+                    await addSystemMessage(`${user} 因长时间未活动已断开连接`);
+                }
+            }
+            updateUserList();
+        }
+
+        // 开始轮询
+        function startPolling() {
+            setInterval(getMessages, 1000); // 每秒更新一次
+            setInterval(cleanOldMessages, 10000); // 每10秒检查一次
+            // 定期更新用户活动时间
+            setInterval(() => {
+                lastActivityTime[nickname] = Date.now();
+            }, 5000);
+        }
+
+        // 监听Enter键发送消息
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
