@@ -101,6 +101,7 @@
         </div>
     </div>
 
+    
     <script>
         // JSONbin配置
         const BIN_ID = '674964cde41b4d34e45caa01';
@@ -108,52 +109,184 @@
         
         let nickname = '';
         let lastMessageTime = Date.now();
-        let messages = [];
-        let onlineUsers = new Set();
-        let lastActivityTime = {};
+        let lastHeartbeat = Date.now();
 
-        // 格式化时间
-        function formatTime(timestamp) {
-            const date = new Date(timestamp);
-            return date.toLocaleTimeString();
+        // 更新在线状态
+        async function updateOnlineStatus() {
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: {
+                        'X-Master-Key': API_KEY
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取数据失败');
+                
+                const data = await response.json();
+                const currentData = data.record || {
+                    messages: [],
+                    onlineUsers: [],
+                    lastUpdate: Date.now(),
+                    userHeartbeats: {}
+                };
+
+                // 更新当前用户的心跳时间
+                currentData.userHeartbeats = currentData.userHeartbeats || {};
+                currentData.userHeartbeats[nickname] = Date.now();
+
+                // 清理超时用户（30秒无响应）
+                const timeoutThreshold = Date.now() - 300000;
+                currentData.onlineUsers = currentData.onlineUsers.filter(user => {
+                    return currentData.userHeartbeats[user] > timeoutThreshold;
+                });
+
+                // 确保当前用户在列表中
+                if (!currentData.onlineUsers.includes(nickname)) {
+                    currentData.onlineUsers.push(nickname);
+                }
+
+                // 更新数据
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify(currentData)
+                });
+
+                // 更新用户列表显示
+                updateUserList(currentData.onlineUsers);
+
+            } catch (error) {
+                console.error('更新在线状态错误:', error);
+            }
+        }
+
+        // 更新用户列表显示
+        function updateUserList(users) {
+            const userListContent = document.getElementById('userListContent');
+            userListContent.innerHTML = users.map(user => 
+                `<div class="user-list-item">${user}</div>`
+            ).join('');
         }
 
         // 登录函数
         async function login() {
             nickname = document.getElementById('nicknameInput').value.trim();
-            if (nickname) {
-                if (onlineUsers.has(nickname)) {
-                    alert('该昵称已被使用');
+            if (!nickname) {
+                alert('请输入昵称');
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: {
+                        'X-Master-Key': API_KEY
+                    }
+                });
+                
+                if (!response.ok) throw new Error('获取数据失败');
+
+                const data = await response.json();
+                const currentData = data.record || {
+                    messages: [],
+                    onlineUsers: [],
+                    lastUpdate: Date.now(),
+                    userHeartbeats: {}
+                };
+
+                // 检查用户名是否已存在且活跃
+                const timeoutThreshold = Date.now() - 30000;
+                if (currentData.userHeartbeats[nickname] > timeoutThreshold) {
+                    alert('该昵称已被使用，请换一个');
                     return;
                 }
+
+                // 添加新用户
+                if (!currentData.onlineUsers.includes(nickname)) {
+                    currentData.onlineUsers.push(nickname);
+                }
+                currentData.userHeartbeats[nickname] = Date.now();
+
+                // 添加系统消息
+                currentData.messages.push({
+                    type: 'system',
+                    content: `${nickname} 加入了聊天室`,
+                    timestamp: Date.now()
+                });
+
+                // 更新数据
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify(currentData)
+                });
+
+                // 显示聊天界面
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('chatScreen').classList.remove('hidden');
-                await addSystemMessage(`${nickname} 加入了聊天室`);
-                onlineUsers.add(nickname);
-                updateUserList();
                 startPolling();
-                window.addEventListener('beforeunload', handleUserExit);
-            } else {
-                alert('请输入昵称');
+
+            } catch (error) {
+                console.error('登录错误:', error);
+                alert('登录失败，请重试');
             }
         }
 
-        // 处理用户退出
-        async function handleUserExit() {
-            await addSystemMessage(`${nickname} 离开了聊天室`);
-            onlineUsers.delete(nickname);
-            updateUserList();
+        // 开始轮询
+        function startPolling() {
+            // 获取消息和更新用户列表
+            setInterval(async () => {
+                try {
+                    const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                        headers: {
+                            'X-Master-Key': API_KEY
+                        }
+                    });
+                    
+                    if (!response.ok) throw new Error('获取数据失败');
+                    
+                    const data = await response.json();
+                    const currentData = data.record;
+                    
+                    // 更新消息显示
+                    updateChatBox(currentData.messages);
+                    // 更新用户列表
+                    updateUserList(currentData.onlineUsers);
+                    
+                } catch (error) {
+                    console.error('轮询错误:', error);
+                }
+            }, 10000);
+
+            // 定期更新在线状态
+            setInterval(updateOnlineStatus, 50000);
         }
 
-        // 添加系统消息
-        async function addSystemMessage(content) {
-            const systemMessage = {
-                type: 'system',
-                content: content,
-                timestamp: Date.now()
-            };
-            messages.push(systemMessage);
-            await updateJSONbin();
+        // 更新聊天框显示
+        function updateChatBox(messages) {
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML = messages.map(msg => {
+                const time = new Date(msg.timestamp).toLocaleTimeString();
+                if (msg.type === 'system') {
+                    return `
+                        <div class="message system-message">
+                            <span class="timestamp">${time}</span>
+                            ${msg.content}
+                        </div>`;
+                } else {
+                    return `
+                        <div class="message">
+                            <span class="timestamp">${time}</span>
+                            <strong>${msg.nickname}:</strong> ${msg.content}
+                        </div>`;
+                }
+            }).join('');
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         // 发送消息
@@ -162,56 +295,54 @@
             const message = messageInput.value.trim();
             
             if (message) {
-                const newMessage = {
-                    type: 'user',
-                    nickname: nickname,
-                    content: message,
-                    timestamp: Date.now()
-                };
+                try {
+                    const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                        headers: {
+                            'X-Master-Key': API_KEY
+                        }
+                    });
+                    
+                    if (!response.ok) throw new Error('获取数据失败');
 
-                messages.push(newMessage);
-                await updateJSONbin();
-                messageInput.value = '';
-                lastMessageTime = Date.now();
-                lastActivityTime[nickname] = Date.now();
-            }
-        }
+                    const data = await response.json();
+                    const currentData = data.record;
 
-        // 更新用户列表
-        function updateUserList() {
-            const userListContent = document.getElementById('userListContent');
-            userListContent.innerHTML = Array.from(onlineUsers)
-                .map(user => `<div class="user-list-item">${user}</div>`)
-                .join('');
-        }
+                    // 添加新消息
+                    currentData.messages.push({
+                        type: 'message',
+                        nickname: nickname,
+                        content: message,
+                        timestamp: Date.now()
+                    });
 
-        // 更新JSONbin
-        async function updateJSONbin() {
-            try {
-                const data = {
-                    messages: messages,
-                    onlineUsers: Array.from(onlineUsers)
-                };
-                
-                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': API_KEY
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                if (!response.ok) {
-                    throw new Error('更新失败');
+                    // 更新数据
+                    await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Master-Key': API_KEY
+                        },
+                        body: JSON.stringify(currentData)
+                    });
+
+                    messageInput.value = '';
+
+                } catch (error) {
+                    console.error('发送消息错误:', error);
+                    alert('发送失败，请重试');
                 }
-            } catch (error) {
-                console.error('更新错误:', error);
             }
         }
 
-        // 获取消息和用户列表
-        async function getMessages() {
+        // 监听Enter键发送消息
+        document.getElementById('messageInput')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // 页面关闭时移除用户
+        window.addEventListener('beforeunload', async () => {
             try {
                 const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                     headers: {
@@ -219,76 +350,34 @@
                     }
                 });
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.record) {
-                        messages = data.record.messages || [];
-                        onlineUsers = new Set(data.record.onlineUsers || []);
-                        updateChatBox();
-                        updateUserList();
-                    }
-                }
+                if (!response.ok) throw new Error('获取数据失败');
+
+                const data = await response.json();
+                const currentData = data.record;
+
+                // 移除用户
+                currentData.onlineUsers = currentData.onlineUsers.filter(user => user !== nickname);
+                delete currentData.userHeartbeats[nickname];
+
+                // 添加退出消息
+                currentData.messages.push({
+                    type: 'system',
+                    content: `${nickname} 离开了聊天室`,
+                    timestamp: Date.now()
+                });
+
+                // 更新数据
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify(currentData)
+                });
+
             } catch (error) {
-                console.error('获取消息错误:', error);
-            }
-        }
-
-        // 更新聊天框
-        function updateChatBox() {
-            const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML = messages.map(msg => {
-                if (msg.type === 'system') {
-                    return `
-                        <div class="message system-message">
-                            <span class="timestamp">${formatTime(msg.timestamp)}</span>
-                            ${msg.content}
-                        </div>`;
-                } else {
-                    return `
-                        <div class="message">
-                            <span class="timestamp">${formatTime(msg.timestamp)}</span>
-                            <strong>${msg.nickname}:</strong> ${msg.content}
-                        </div>`;
-                }
-            }).join('');
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        // 清理旧消息和离线用户
-        async function cleanOldMessages() {
-            const currentTime = Date.now();
-            const timeout = 300000; // 30秒超时
-
-            // 清理旧消息
-            if (currentTime - lastMessageTime > timeout) {
-                messages = [];
-                await updateJSONbin();
-            }
-
-            // 清理离线用户
-            for (const user of onlineUsers) {
-                if (currentTime - (lastActivityTime[user] || 0) > timeout) {
-                    onlineUsers.delete(user);
-                    await addSystemMessage(`${user} 因长时间未活动已断开连接`);
-                }
-            }
-            updateUserList();
-        }
-
-        // 开始轮询
-        function startPolling() {
-            setInterval(getMessages, 5000); // 每秒更新一次
-            setInterval(cleanOldMessages, 100000); // 每10秒检查一次
-            // 定期更新用户活动时间
-            setInterval(() => {
-                lastActivityTime[nickname] = Date.now();
-            }, 5000);
-        }
-
-        // 监听Enter键发送消息
-        document.getElementById('messageInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
+                console.error('退出错误:', error);
             }
         });
     </script>
