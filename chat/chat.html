@@ -257,7 +257,7 @@
         // 清理旧消息和离线用户
         async function cleanOldMessages() {
             const currentTime = Date.now();
-            const timeout = 30000; // 30秒超时
+            const timeout = 300000; // 30秒超时
 
             // 清理旧消息
             if (currentTime - lastMessageTime > timeout) {
@@ -277,8 +277,8 @@
 
         // 开始轮询
         function startPolling() {
-            setInterval(getMessages, 1000); // 每秒更新一次
-            setInterval(cleanOldMessages, 10000); // 每10秒检查一次
+            setInterval(getMessages, 5000); // 每秒更新一次
+            setInterval(cleanOldMessages, 100000); // 每10秒检查一次
             // 定期更新用户活动时间
             setInterval(() => {
                 lastActivityTime[nickname] = Date.now();
