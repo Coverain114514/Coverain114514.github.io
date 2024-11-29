@@ -1,0 +1,90 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>联系我们</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .contact-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .contact-item {
+            text-align: center;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            transition: transform 0.3s ease;
+        }
+
+        .contact-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .contact-item a {
+            text-decoration: none;
+            color: #333;
+        }
+
+        .contact-item i {
+            font-size: 2em;
+            margin-bottom: 10px;
+            color: #007bff;
+        }
+    </style>
+    <!-- 引入Font Awesome图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <h1>联系我们</h1>
+    
+    <div class="contact-container">
+        <!-- 微信 -->
+        <div class="contact-item">
+            <a href="weixin://dl/chat?YourWeChatID">
+                <i class="fab fa-weixin"></i>
+                <h3>微信</h3>
+                <p>点击添加微信好友</p>
+            </a>
+        </div>
+
+        <!-- 邮箱 -->
+        <div class="contact-item">
+            <a href="mailto:your.email@example.com">
+                <i class="fas fa-envelope"></i>
+                <h3>电子邮件</h3>
+                <p>your.email@example.com</p>
+            </a>
+        </div>
+
+        <!-- QQ -->
+        <div class="contact-item">
+            <a href="tencent://message/?uin=YourQQNumber">
+                <i class="fab fa-qq"></i>
+                <h3>QQ</h3>
+                <p>点击添加QQ好友</p>
+            </a>
+        </div>
+
+        <!-- 电话 -->
+        <div class="contact-item">
+            <a href="tel:+86123456789">
+                <i class="fas fa-phone"></i>
+                <h3>电话</h3>
+                <p>+86 123 4567 890</p>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
