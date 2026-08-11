@@ -147,59 +147,27 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API (v2 with v1 fallback) ----------
-        async function fetchBasicInfo(key) {
-            // Try v2
-            let url = `https://api.torn.com/v2/user?key=${key}`;
-            let res = await fetch(url);
-            let json = await res.json();
-            let data = json.data || json;
-
-            // If v2 missing player_id, try v1
-            if (!data.player_id) {
-                logToDebug('[Torn] v2 response missing player_id, trying v1...');
-                url = `https://api.torn.com/user/?selections=basic&key=${key}`;
-                res = await fetch(url);
-                json = await res.json();
-                if (json.error) throw new Error(json.error.error || json.error);
-                data = json; // v1 returns flat object
-            }
-
-            if (!data.player_id) {
-                throw new Error('No player_id in API response');
-            }
-            return { id: data.player_id, name: data.name };
-        }
-
-        async function fetchLogs(key) {
-            // Try v2 with logs selection
-            let url = `https://api.torn.com/v2/user?selections=logs&key=${key}`;
-            let res = await fetch(url);
-            let json = await res.json();
-            if (json.error) {
-                // fallback to v1
-                url = `https://api.torn.com/user/?selections=logs&key=${key}`;
-                res = await fetch(url);
-                json = await res.json();
-                if (json.error) throw new Error(json.error.error || json.error);
-            }
-            const data = json.data || json;
-            const logs = data.logs;
-            if (!logs || Object.keys(logs).length === 0) return [];
-            return Object.values(logs).sort((a, b) => b.timestamp - a.timestamp);
+        // ---------- Torn API v1 (stable) ----------
+        async function fetchUserData(key) {
+            // Request both basic and logs in one call
+            const url = `https://api.torn.com/user/?selections=basic,logs&key=${key}`;
+            const res = await fetch(url);
+            const json = await res.json();
+            if (json.error) throw new Error(json.error.error || json.error);
+            return json; // v1 returns flat object with player_id, name, logs, etc.
         }
 
         async function verifyTornKey(key) {
             try {
-                const user = await fetchBasicInfo(key);
-                return user;
+                const data = await fetchUserData(key);
+                if (!data.player_id) throw new Error('No player_id in response');
+                return { id: data.player_id, name: data.name };
             } catch (err) {
                 logToDebug('[Torn] Key verification failed: ' + err.message);
-                // Show raw response in debug box
                 try {
-                    const res = await fetch(`https://api.torn.com/v2/user?key=${key}`);
+                    const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                     const json = await res.json();
-                    logToDebug('Raw v2 response: ' + JSON.stringify(json).slice(0, 500));
+                    logToDebug('Raw v1 basic response: ' + JSON.stringify(json).slice(0, 500));
                 } catch(e) {}
                 return null;
             }
@@ -207,20 +175,23 @@
 
         async function checkOnlineStatus(key) {
             try {
-                const logs = await fetchLogs(key);
-                const snippet = JSON.stringify(logs.slice(0, 3), null, 2);
+                const data = await fetchUserData(key);
+                // Show snippet in debug box
+                const snippet = JSON.stringify(data, null, 2).slice(0, 600);
                 clearDebug();
-                logToDebug('✅ Latest 3 log entries:\n' + snippet);
+                logToDebug('✅ Torn API response (basic + logs):\n' + snippet);
 
-                if (!logs.length) {
+                const logs = data.logs;
+                if (!logs || Object.keys(logs).length === 0) {
                     document.getElementById('permissionHint').innerHTML =
                         '⚠️ No log entries found. Your API key may lack "logs" permission.<br>' +
                         'Go to <a href="https://www.torn.com/preferences.php?step=api" target="_blank">Torn API Settings</a>, ' +
-                        'select your key and enable <b>"logs"</b>, or create a new key with default permissions.';
+                        'select your key and ensure <b>"logs"</b> is enabled, or create a new key (default includes logs).';
                     return { online: false, lastActivity: null, secondsAgo: null };
                 }
 
-                const latestLog = logs[0];
+                const logsArray = Object.values(logs).sort((a, b) => b.timestamp - a.timestamp);
+                const latestLog = logsArray[0];
                 const timestamp = latestLog.timestamp;
                 const nowSec = Math.floor(Date.now() / 1000);
                 const secondsAgo = nowSec - timestamp;
@@ -234,7 +205,7 @@
             } catch (err) {
                 logToDebug('[Torn] Logs fetch error: ' + err.message);
                 document.getElementById('permissionHint').innerHTML =
-                    '❌ Unable to fetch logs. Please ensure your API key has "logs" permission.';
+                    '❌ Failed to fetch data. Make sure your API key has "basic" and "logs" permissions.';
                 return { online: false, lastActivity: null, secondsAgo: null };
             }
         }
@@ -377,7 +348,7 @@
             document.getElementById('userNameDisplay').textContent = user.name;
             document.getElementById('userIdDisplay').textContent = user.id;
             document.getElementById('loginBtn').textContent = '🔄 Signed in';
-            logToDebug(`Logged in as ${user.name}`);
+            logToDebug(`✅ Logged in as ${user.name} (ID: ${user.id})`);
 
             if (pollInterval) clearInterval(pollInterval);
             if (gridRefreshInterval) clearInterval(gridRefreshInterval);
