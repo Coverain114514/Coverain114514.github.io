@@ -15,7 +15,6 @@
             overflow: hidden;
         }
 
-        /* ----- Sidebar ----- */
         .sidebar {
             width: 220px;
             background: #1e1e1e;
@@ -66,14 +65,12 @@
             padding: 5px;
         }
 
-        /* ----- Main Content ----- */
         .main-content {
             flex: 1;
             padding: 30px;
             overflow-y: auto;
         }
 
-        /* API Key bar (hidden after success) */
         .api-bar {
             background: #252525;
             padding: 15px;
@@ -105,7 +102,6 @@
             font-weight: bold;
         }
 
-        /* View containers */
         .view {
             display: none;
             animation: fadeIn 0.2s;
@@ -118,7 +114,6 @@
             to { opacity: 1; }
         }
 
-        /* Overview */
         .overview-header {
             display: flex;
             align-items: center;
@@ -147,7 +142,6 @@
             font-size: 0.95rem;
         }
 
-        /* Tables & Cards */
         .card {
             background: #252525;
             border-radius: 12px;
@@ -233,7 +227,7 @@
 
     <!-- Main Content -->
     <div class="main-content">
-        <!-- API Key bar (visible until first success) -->
+        <!-- API Key bar -->
         <div class="api-bar" id="apiBar">
             <input type="text" id="apiKeyInput" placeholder="Enter your Torn API Key">
             <button id="saveKeyBtn">💾 Save Key</button>
@@ -306,18 +300,15 @@
         const refreshBtn = document.getElementById('refreshBtn');
         const changeKeyBtn = document.getElementById('changeKeyBtn');
 
-        // Sidebar
         const sidebarFactionName = document.getElementById('sidebarFactionName');
         const navBtns = document.querySelectorAll('.nav-btn');
 
-        // Overview
         const factionLogo = document.getElementById('factionLogo');
         const overviewName = document.getElementById('overviewName');
         const overviewTag = document.getElementById('overviewTag');
         const overviewMembers = document.getElementById('overviewMembers');
         const overviewLeader = document.getElementById('overviewLeader');
 
-        // Views
         const views = {
             overview: document.getElementById('viewOverview'),
             targets: document.getElementById('viewTargets'),
@@ -326,20 +317,13 @@
             announcement: document.getElementById('viewAnnouncement')
         };
 
-        // Target list
         const newTargetInput = document.getElementById('newTargetInput');
         const addTargetBtn = document.getElementById('addTargetBtn');
         const targetListBody = document.getElementById('targetListBody');
 
-        // Members
         const memberListBody = document.getElementById('memberListBody');
-
-        // War
         const warContent = document.getElementById('warContent');
-
-        // Announcement
         const announcementContent = document.getElementById('announcementContent');
-
         const lastUpdateSpan = document.getElementById('lastUpdate');
 
         // ---------- Helpers ----------
@@ -362,15 +346,8 @@
         // ---------- View Switching ----------
         function switchView(viewName) {
             currentView = viewName;
-            // Update buttons
-            navBtns.forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.view === viewName);
-            });
-            // Update content visibility
-            Object.keys(views).forEach(key => {
-                views[key].classList.toggle('active', key === viewName);
-            });
-            // Trigger rendering for the new view
+            navBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.view === viewName));
+            Object.keys(views).forEach(key => views[key].classList.toggle('active', key === viewName));
             renderCurrentView();
         }
 
@@ -423,7 +400,7 @@
             renderTargets();
         }
 
-        // ---------- Data Fetching ----------
+        // ---------- Data Fetching (API v2) ----------
         async function fetchFactionData(showApiBarOnError = true) {
             if (!apiKey || apiKey === 'YOUR_API_KEY') {
                 alert('Please enter a valid Torn API Key first!');
@@ -431,18 +408,17 @@
                 return false;
             }
             try {
-                const url = `https://api.torn.com/faction/?selections=basic,members&key=${apiKey}`;
+                // ✅ Updated to API v2
+                const url = `https://api.torn.com/v2/faction?selections=basic,members&key=${apiKey}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error.error);
                 factionData = data;
-                // Hide API bar on first success
                 apiBar.classList.add('hidden');
-                // Update sidebar name
                 sidebarFactionName.textContent = data.name || 'Faction';
                 renderOverview();
-                renderCurrentView(); // update active view too
+                renderCurrentView();
                 lastUpdateSpan.textContent = 'Last updated: ' + new Date().toLocaleTimeString('en-US');
                 return true;
             } catch (err) {
@@ -457,7 +433,8 @@
 
         async function fetchWarData() {
             try {
-                const warRes = await fetch(`https://api.torn.com/faction/war?key=${apiKey}`);
+                // ✅ Updated to API v2
+                const warRes = await fetch(`https://api.torn.com/v2/faction/war?key=${apiKey}`);
                 if (!warRes.ok) return null;
                 const warData = await warRes.json();
                 if (warData.error) return null;
@@ -467,7 +444,8 @@
 
         async function fetchOpponentFaction(factionId) {
             try {
-                const res = await fetch(`https://api.torn.com/faction/${factionId}?selections=basic,members&key=${apiKey}`);
+                // ✅ Updated to API v2
+                const res = await fetch(`https://api.torn.com/v2/faction/${factionId}?selections=basic,members&key=${apiKey}`);
                 if (!res.ok) return null;
                 const data = await res.json();
                 return data.error ? null : data;
@@ -594,14 +572,12 @@
 
         // ---------- Init ----------
         apiKeyInput.value = apiKey;
-        renderTargets(); // prepare target list data
+        renderTargets();
 
-        // Attempt initial load with saved key (show bar if needed)
         fetchFactionData(false).then(success => {
             if (!success) apiBar.classList.remove('hidden');
         });
 
-        // Auto refresh every 30s (only basic data, war is loaded on view)
         setInterval(() => fetchFactionData(false), 30000);
     </script>
 </body>
