@@ -1,3 +1,4 @@
+html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -85,9 +86,9 @@
     </div>
 
     <div id="onlineStatus" class="status-indicator" style="display:none;">
-        Current Torn status: <span id="statusText"></span>
+        Current check: <span id="statusText">-</span>
         <br>
-        <span id="lastActionInfo" style="font-size:0.8rem;color:#8b949e;"></span>
+        <span id="lastCheckInfo" style="font-size:0.8rem;color:#8b949e;"></span>
     </div>
 
     <button id="manualRefreshBtn" class="manual-refresh" onclick="window.handleManualRefresh()">🔄 Refresh Grid Now</button>
@@ -99,8 +100,7 @@
     </div>
 
     <div class="debug-box" id="debugBox">
-        <strong>🔍 API Response Inspector</strong><br>
-        (Click Refresh Grid Now to see raw response)
+        <strong>🔍 Activity Log</strong><br>
     </div>
     <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
     <div id="permissionHint" class="hint"></div>
@@ -112,7 +112,7 @@
 
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const SLOTS = 48;
-        const ONLINE_THRESHOLD_SEC = 300;
+        const CHECK_INTERVAL = 30000; // 30 seconds
 
         let currentUser = null;
         let pollInterval = null;
@@ -125,7 +125,7 @@
         }
 
         function clearDebug() {
-            document.getElementById('debugBox').innerHTML = '<strong>🔍 API Response Inspector</strong><br>(Click Refresh Grid Now to see raw response)';
+            document.getElementById('debugBox').innerHTML = '<strong>🔍 Activity Log</strong><br>';
         }
 
         // ---------- Helpers ----------
@@ -147,84 +147,35 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API v1 (stable, combined request) ----------
-        async function fetchTornData(key) {
-            // Request basic + logs together
-            const url = `https://api.torn.com/user/?selections=basic,logs&key=${key}`;
+        // ---------- Torn API v1 basic only (super stable) ----------
+        async function fetchBasic(key) {
+            const url = `https://api.torn.com/user/?selections=basic&key=${key}`;
             const res = await fetch(url);
             const json = await res.json();
             if (json.error) throw new Error(json.error.error || json.error);
-            return json; // v1 flat object
+            return json;
         }
 
         async function verifyTornKey(key) {
             try {
-                const data = await fetchTornData(key);
+                const data = await fetchBasic(key);
                 if (!data.player_id) throw new Error('Missing player_id');
                 return { id: data.player_id, name: data.name };
             } catch (err) {
                 logToDebug('[Torn] Verification failed: ' + err.message);
-                // Show raw response for debugging
-                try {
-                    const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
-                    const json = await res.json();
-                    logToDebug('Raw basic response: ' + JSON.stringify(json).slice(0, 400));
-                } catch(e) {}
                 return null;
             }
         }
 
+        // Simple online check: if we can reach Torn, mark online
         async function checkOnlineStatus(key) {
             try {
-                const data = await fetchTornData(key);
-                // Display snippet in debug box
-                const snippet = JSON.stringify(data, null, 2).slice(0, 700);
-                clearDebug();
-                logToDebug('✅ Torn API response (basic+logs):\n' + snippet);
-
-                // First attempt: use logs if available
-                if (data.logs && Object.keys(data.logs).length > 0) {
-                    const logsArray = Object.values(data.logs).sort((a, b) => b.timestamp - a.timestamp);
-                    const latestLog = logsArray[0];
-                    const timestamp = latestLog.timestamp;
-                    const nowSec = Math.floor(Date.now() / 1000);
-                    const secondsAgo = nowSec - timestamp;
-                    const online = secondsAgo < ONLINE_THRESHOLD_SEC;
-                    return {
-                        online,
-                        lastActivity: timestamp,
-                        secondsAgo,
-                        source: 'logs',
-                        logDescription: latestLog.log || latestLog.title || 'Unknown'
-                    };
-                }
-
-                // Fallback: use last_action if logs missing
-                if (data.last_action && data.last_action.timestamp) {
-                    const timestamp = data.last_action.timestamp;
-                    const nowSec = Math.floor(Date.now() / 1000);
-                    const secondsAgo = nowSec - timestamp;
-                    const online = secondsAgo < ONLINE_THRESHOLD_SEC;
-                    logToDebug('⚠️ Logs missing, using last_action instead.');
-                    return {
-                        online,
-                        lastActivity: timestamp,
-                        secondsAgo,
-                        source: 'last_action'
-                    };
-                }
-
-                // Neither available
-                document.getElementById('permissionHint').innerHTML =
-                    '⚠️ No log data or last_action found. Your API key may lack "logs" and "basic" permissions.<br>' +
-                    'Go to <a href="https://www.torn.com/preferences.php?step=api" target="_blank">Torn API Settings</a>, ' +
-                    'ensure <b>"basic"</b> and <b>"logs"</b> are enabled for your key.';
-                return { online: false, lastActivity: null, secondsAgo: null };
+                await fetchBasic(key);
+                // Request succeeded -> we consider user online at this moment
+                return true;
             } catch (err) {
-                logToDebug('[Torn] Fetch error: ' + err.message);
-                document.getElementById('permissionHint').innerHTML =
-                    '❌ Unable to fetch data. Please check your API key and network.';
-                return { online: false, lastActivity: null, secondsAgo: null };
+                logToDebug('[Torn] Connection failed: ' + err.message);
+                return false;
             }
         }
 
@@ -283,33 +234,25 @@
             if (!savedKey) return;
 
             document.getElementById('permissionHint').innerHTML = '';
-            logToDebug('Checking recent activity...');
-            const status = await checkOnlineStatus(savedKey);
+            clearDebug();
+            logToDebug('Pinging Torn API...');
+            const online = await checkOnlineStatus(savedKey);
 
             document.getElementById('onlineStatus').style.display = 'block';
             const statusText = document.getElementById('statusText');
-            const lastActionInfo = document.getElementById('lastActionInfo');
+            const lastCheckInfo = document.getElementById('lastCheckInfo');
+            const nowStr = new Date().toLocaleTimeString();
 
-            if (status.online) {
-                statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
-            } else {
-                statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
-            }
-
-            if (status.lastActivity) {
-                const dateStr = new Date(status.lastActivity * 1000).toLocaleString();
-                const source = status.source === 'logs' ? `Log: ${status.logDescription}` : 'last_action';
-                lastActionInfo.innerHTML = `${source} at ${dateStr} · ${status.secondsAgo}s ago`;
-            } else {
-                lastActionInfo.textContent = 'No activity data available';
-            }
-
-            if (status.online) {
+            if (online) {
+                statusText.innerHTML = '<span class="status-online">● API Reachable</span>';
+                lastCheckInfo.textContent = `Checked at ${nowStr} — marking current slot.`;
                 const { date, slot } = getCurrentDateAndSlot();
                 await upsertPresence(currentUser.id, date, slot);
                 logToDebug(`✅ Marked online at slot ${slot}`);
             } else {
-                logToDebug(`⏸ Inactive`);
+                statusText.innerHTML = '<span class="status-offline">○ API Unreachable</span>';
+                lastCheckInfo.textContent = `Checked at ${nowStr} — not marking.`;
+                logToDebug(`⏸ Torn API not reachable, skipped marking.`);
             }
         }
 
@@ -357,7 +300,7 @@
             logToDebug('Verifying API key...');
             const user = await verifyTornKey(key);
             if (!user) {
-                alert('Invalid API key. See debug box for details.');
+                alert('Invalid API key. See activity log for details.');
                 return;
             }
 
@@ -375,8 +318,8 @@
             await updateMyPresence();
             await loadAndRenderGrid();
 
-            pollInterval = setInterval(updateMyPresence, 30000);
-            gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
+            pollInterval = setInterval(updateMyPresence, CHECK_INTERVAL);
+            gridRefreshInterval = setInterval(loadAndRenderGrid, CHECK_INTERVAL);
         };
 
         window.handleManualRefresh = async function() {
@@ -384,7 +327,6 @@
                 alert('Please sign in first.');
                 return;
             }
-            document.getElementById('permissionHint').innerHTML = '';
             await updateMyPresence();
             await loadAndRenderGrid();
         };
