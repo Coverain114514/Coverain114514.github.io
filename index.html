@@ -81,9 +81,7 @@
             align-items: center;
             border: 1px solid #333;
         }
-        .api-bar.hidden {
-            display: none;
-        }
+        .api-bar.hidden { display: none; }
         .api-bar input {
             flex: 1;
             padding: 8px 12px;
@@ -102,13 +100,8 @@
             font-weight: bold;
         }
 
-        .view {
-            display: none;
-            animation: fadeIn 0.2s;
-        }
-        .view.active {
-            display: block;
-        }
+        .view { display: none; animation: fadeIn 0.2s; }
+        .view.active { display: block; }
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -128,19 +121,9 @@
             background: #2a2a2a;
             border: 2px solid #444;
         }
-        .overview-info h2 {
-            font-size: 2rem;
-            color: #fff;
-        }
-        .overview-info .tag {
-            color: #aaa;
-            font-size: 1.1rem;
-            margin: 5px 0;
-        }
-        .overview-info .stats {
-            color: #888;
-            font-size: 0.95rem;
-        }
+        .overview-info h2 { font-size: 2rem; color: #fff; }
+        .overview-info .tag { color: #aaa; font-size: 1.1rem; margin: 5px 0; }
+        .overview-info .stats { color: #888; font-size: 0.95rem; }
 
         .card {
             background: #252525;
@@ -148,73 +131,29 @@
             padding: 20px;
             border: 1px solid #333;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-        th, td {
-            padding: 8px;
-            border-bottom: 1px solid #333;
-            text-align: left;
-        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 8px; border-bottom: 1px solid #333; text-align: left; }
         .online { color: #2ecc71; font-weight: bold; }
         .offline { color: #7f8c8d; }
-        .no-data {
-            color: #888;
-            font-style: italic;
-            text-align: center;
-            padding: 20px;
-        }
+        .no-data { color: #888; font-style: italic; text-align: center; padding: 20px; }
 
-        .add-target {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 15px;
-        }
+        .add-target { display: flex; gap: 5px; margin-bottom: 15px; }
         .add-target input {
-            flex: 1;
-            padding: 6px;
-            background: #333;
-            border: 1px solid #555;
-            color: #ddd;
-            border-radius: 4px;
+            flex: 1; padding: 6px; background: #333; border: 1px solid #555; color: #ddd; border-radius: 4px;
         }
         .add-target button, .delete-btn {
-            background: #2980b9;
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
+            background: #2980b9; border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer;
         }
-        .delete-btn {
-            background: #c0392b;
-            padding: 3px 8px;
-            font-size: 0.8rem;
-        }
+        .delete-btn { background: #c0392b; padding: 3px 8px; font-size: 0.8rem; }
         .announcement-box {
-            background: #1e1e1e;
-            padding: 20px;
-            border-radius: 8px;
-            white-space: pre-wrap;
-            font-style: italic;
+            background: #1e1e1e; padding: 20px; border-radius: 8px; white-space: pre-wrap; font-style: italic;
         }
-        .war-opponent-members {
-            margin-top: 20px;
-        }
-
-        .refresh-info {
-            margin-top: 25px;
-            font-size: 0.8rem;
-            color: #666;
-            text-align: center;
-        }
+        .war-opponent-members { margin-top: 20px; }
+        .refresh-info { margin-top: 25px; font-size: 0.8rem; color: #666; text-align: center; }
     </style>
 </head>
 <body>
 
-    <!-- Sidebar -->
     <div class="sidebar">
         <h3 id="sidebarFactionName">Faction</h3>
         <button class="nav-btn active" data-view="overview">🏠 Overview</button>
@@ -225,7 +164,6 @@
         <button class="change-key" id="changeKeyBtn">Change API Key</button>
     </div>
 
-    <!-- Main Content -->
     <div class="main-content">
         <div class="api-bar" id="apiBar">
             <input type="text" id="apiKeyInput" placeholder="Enter your Torn API Key">
@@ -285,16 +223,15 @@
     <script>
         const DEFAULT_API_KEY = 'YOUR_API_KEY';
         let apiKey = localStorage.getItem('torn_api_key') || DEFAULT_API_KEY;
-        let factionData = null;        // will hold combined basic + members
+        let factionData = null;
         let currentView = 'overview';
 
-        // ---------- DOM ----------
+        // DOM elements
         const apiBar = document.getElementById('apiBar');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveKeyBtn = document.getElementById('saveKeyBtn');
         const refreshBtn = document.getElementById('refreshBtn');
         const changeKeyBtn = document.getElementById('changeKeyBtn');
-
         const sidebarFactionName = document.getElementById('sidebarFactionName');
         const navBtns = document.querySelectorAll('.nav-btn');
 
@@ -320,28 +257,18 @@
         const announcementContent = document.getElementById('announcementContent');
         const lastUpdateSpan = document.getElementById('lastUpdate');
 
-        // ---------- Helpers ----------
-        function formatTime(timestamp) {
-            if (!timestamp) return 'Unknown';
-            return new Date(timestamp * 1000).toLocaleString('en-US');
+        // Helpers
+        function formatTime(t) { return t ? new Date(t * 1000).toLocaleString('en-US') : 'Unknown'; }
+        function isOnline(ts) { return ts ? (Math.floor(Date.now()/1000) - ts) < 300 : false; }
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
         }
 
-        function isOnline(lastActionTimestamp) {
-            if (!lastActionTimestamp) return false;
-            return (Math.floor(Date.now() / 1000) - lastActionTimestamp) < 300;
-        }
-
-        function escapeHtml(text) {
-            return String(text).replace(/[&<>"']/g, m => ({
-                '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-            })[m]);
-        }
-
-        // ---------- View Switching ----------
-        function switchView(viewName) {
-            currentView = viewName;
-            navBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.view === viewName));
-            Object.keys(views).forEach(key => views[key].classList.toggle('active', key === viewName));
+        // View switching
+        function switchView(v) {
+            currentView = v;
+            navBtns.forEach(b => b.classList.toggle('active', b.dataset.view === v));
+            Object.keys(views).forEach(k => views[k].classList.toggle('active', k === v));
             renderCurrentView();
         }
 
@@ -355,68 +282,41 @@
             }
         }
 
-        // ---------- Target List (local storage) ----------
-        function getTargets() {
-            return JSON.parse(localStorage.getItem('torn_targets') || '[]');
-        }
-        function saveTargets(targets) {
-            localStorage.setItem('torn_targets', JSON.stringify(targets));
-        }
+        // Target list (local)
+        function getTargets() { return JSON.parse(localStorage.getItem('torn_targets') || '[]'); }
+        function saveTargets(a) { localStorage.setItem('torn_targets', JSON.stringify(a)); }
         function renderTargets() {
-            const targets = getTargets();
-            targetListBody.innerHTML = targets.length === 0
-                ? '<tr><td colspan="2" class="no-data">No targets yet</td></tr>'
-                : targets.map((t, i) => `<tr>
-                    <td>${escapeHtml(t)}</td>
-                    <td><button class="delete-btn" data-index="${i}">Delete</button></td>
-                </tr>`).join('');
-            document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.onclick = () => {
-                    const idx = parseInt(btn.dataset.index);
-                    const list = getTargets();
-                    list.splice(idx, 1);
-                    saveTargets(list);
-                    renderTargets();
-                };
+            const t = getTargets();
+            targetListBody.innerHTML = t.length ? t.map((x,i) => `<tr><td>${escapeHtml(x)}</td><td><button class="delete-btn" data-index="${i}">Delete</button></td></tr>`).join('') : '<tr><td colspan="2" class="no-data">No targets yet</td></tr>';
+            document.querySelectorAll('.delete-btn').forEach(b => b.onclick = () => {
+                const i = parseInt(b.dataset.index);
+                const list = getTargets();
+                list.splice(i,1);
+                saveTargets(list);
+                renderTargets();
             });
         }
         function addTarget() {
-            const val = newTargetInput.value.trim();
-            if (!val) return;
-            const targets = getTargets();
-            targets.push(val);
-            saveTargets(targets);
+            const v = newTargetInput.value.trim();
+            if (!v) return;
+            const list = getTargets();
+            list.push(v);
+            saveTargets(list);
             newTargetInput.value = '';
             renderTargets();
         }
 
-        // ---------- API v2 Calls ----------
-        async function fetchFactionBasic() {
+        // Data fetching
+        async function fetchFaction() {
             const res = await fetch(`https://api.torn.com/v2/faction?key=${apiKey}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             if (data.error) throw new Error(data.error.error);
-            return data;
+            return data; // Contains name, tag, leader, members, announcement, etc.
         }
 
-        async function fetchFactionMembers() {
-            const res = await fetch(`https://api.torn.com/v2/faction/members?key=${apiKey}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            if (data.error) throw new Error(data.error.error);
-            return data; // structure may be { members: {...} }
-        }
-
-        async function fetchOpponentBasic(factionId) {
-            const res = await fetch(`https://api.torn.com/v2/faction/${factionId}?key=${apiKey}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            if (data.error) throw new Error(data.error.error);
-            return data;
-        }
-
-        async function fetchOpponentMembers(factionId) {
-            const res = await fetch(`https://api.torn.com/v2/faction/${factionId}/members?key=${apiKey}`);
+        async function fetchOpponent(id) {
+            const res = await fetch(`https://api.torn.com/v2/faction/${id}?key=${apiKey}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             if (data.error) throw new Error(data.error.error);
@@ -425,40 +325,30 @@
 
         async function fetchWar() {
             const res = await fetch(`https://api.torn.com/v2/faction/war?key=${apiKey}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (!res.ok) return null; // No war or error
             const data = await res.json();
-            if (data.error) throw new Error(data.error.error);
+            if (data.error) return null; // e.g. error code 11 for no active war
             return data.war || null;
         }
 
-        // ---------- Main Data Fetch ----------
-        async function loadAllData(showApiBarOnError = true) {
+        // Main load
+        async function loadAll(showBar = true) {
             if (!apiKey || apiKey === 'YOUR_API_KEY') {
                 alert('Please enter a valid Torn API Key first!');
                 apiBar.classList.remove('hidden');
                 return false;
             }
             try {
-                const [basic, members] = await Promise.all([
-                    fetchFactionBasic(),
-                    fetchFactionMembers()
-                ]);
-                // Combine: API v2 members might be structured differently.
-                // The members endpoint typically returns { members: { ... } }
-                const membersObj = members.members || members; // fallback
-                factionData = {
-                    ...basic,
-                    members: membersObj
-                };
+                factionData = await fetchFaction();
                 apiBar.classList.add('hidden');
-                sidebarFactionName.textContent = basic.name || 'Faction';
+                sidebarFactionName.textContent = factionData.name || 'Faction';
                 renderOverview();
-                renderCurrentView(); // render active view with new data
+                renderCurrentView();
                 lastUpdateSpan.textContent = 'Last updated: ' + new Date().toLocaleTimeString('en-US');
                 return true;
             } catch (err) {
                 console.error(err);
-                if (showApiBarOnError) {
+                if (showBar) {
                     apiBar.classList.remove('hidden');
                     alert('Failed to load faction data: ' + err.message);
                 }
@@ -466,20 +356,17 @@
             }
         }
 
-        // ---------- Render functions ----------
+        // Render functions
         function renderOverview() {
-            if (!factionData) {
-                overviewName.textContent = 'No data';
-                return;
-            }
+            if (!factionData) { overviewName.textContent = 'No data'; return; }
             const d = factionData;
-            factionLogo.src = `https://www.torn.com/images/factions/logo/${d.ID}.png`;
+            factionLogo.src = `https://www.torn.com/images/factions/logo/${d.id}.png`; // Torn v2 uses 'id'
             factionLogo.style.display = 'block';
-            factionLogo.onerror = () => { factionLogo.style.display = 'none'; };
+            factionLogo.onerror = () => factionLogo.style.display = 'none';
             overviewName.textContent = d.name || 'Unknown Faction';
             overviewTag.textContent = d.tag ? `[${d.tag}]` : '';
-            const memberCount = d.members ? Object.keys(d.members).length : 0;
-            overviewMembers.textContent = `Members: ${memberCount}`;
+            const cnt = d.members ? Object.keys(d.members).length : 0;
+            overviewMembers.textContent = `Members: ${cnt}`;
             overviewLeader.textContent = `Leader: ${d.leader || 'Unknown'}`;
         }
 
@@ -488,21 +375,18 @@
                 memberListBody.innerHTML = '<tr><td colspan="4" class="no-data">No member data</td></tr>';
                 return;
             }
-            const members = Object.entries(factionData.members).map(([id, m]) => ({ id, ...m }));
-            members.sort((a, b) => {
-                const aOn = isOnline(a.last_action?.timestamp);
-                const bOn = isOnline(b.last_action?.timestamp);
-                if (aOn && !bOn) return -1;
-                if (!aOn && bOn) return 1;
-                return (b.level || 0) - (a.level || 0);
+            const mems = Object.entries(factionData.members).map(([id,m]) => ({id,...m}));
+            mems.sort((a,b) => {
+                const ao = isOnline(a.last_action?.timestamp), bo = isOnline(b.last_action?.timestamp);
+                if (ao && !bo) return -1; if (!ao && bo) return 1;
+                return (b.level||0) - (a.level||0);
             });
-            memberListBody.innerHTML = members.map(m => {
+            memberListBody.innerHTML = mems.map(m => {
                 const online = isOnline(m.last_action?.timestamp);
                 return `<tr>
-                    <td>${escapeHtml(m.name)}</td>
-                    <td>${m.level}</td>
-                    <td>${escapeHtml(m.position || 'Member')}</td>
-                    <td class="${online ? 'online' : 'offline'}">${online ? '● Online' : '○ Offline'}</td>
+                    <td>${escapeHtml(m.name)}</td><td>${m.level}</td>
+                    <td>${escapeHtml(m.position||'Member')}</td>
+                    <td class="${online?'online':'offline'}">${online?'● Online':'○ Offline'}</td>
                 </tr>`;
             }).join('');
         }
@@ -510,97 +394,69 @@
         async function renderWarView() {
             warContent.innerHTML = '<div class="no-data">Checking war status...</div>';
             let war;
-            try {
-                war = await fetchWar();
-            } catch {
-                warContent.innerHTML = '<div class="no-data">Unable to check war status</div>';
-                return;
-            }
+            try { war = await fetchWar(); } catch { war = null; }
             if (!war) {
                 warContent.innerHTML = '<div class="no-data">No active faction war ⚔️</div>';
                 return;
             }
-            const opponentId = war.target;
-            let opponentName = opponentId, opponentTag = '', membersHtml = '';
+            const oppId = war.target;
+            let oppName = oppId, oppTag = '', memHtml = '';
             try {
-                const [oppBasic, oppMembers] = await Promise.all([
-                    fetchOpponentBasic(opponentId),
-                    fetchOpponentMembers(opponentId)
-                ]);
-                opponentName = oppBasic.name || opponentId;
-                opponentTag = oppBasic.tag ? `[${oppBasic.tag}]` : '';
-                const membersObj = oppMembers.members || oppMembers;
-                if (membersObj && Object.keys(membersObj).length > 0) {
-                    const mems = Object.values(membersObj);
-                    membersHtml = mems.map(m => {
+                const opp = await fetchOpponent(oppId);
+                oppName = opp.name || oppId;
+                oppTag = opp.tag ? `[${opp.tag}]` : '';
+                if (opp.members) {
+                    const mems = Object.values(opp.members);
+                    memHtml = mems.map(m => {
                         const online = isOnline(m.last_action?.timestamp);
-                        return `<tr>
-                            <td>${escapeHtml(m.name)}</td>
-                            <td>${m.level}</td>
-                            <td class="${online ? 'online' : 'offline'}">${online ? 'Online' : 'Offline'}</td>
-                        </tr>`;
+                        return `<tr><td>${escapeHtml(m.name)}</td><td>${m.level}</td><td class="${online?'online':'offline'}">${online?'Online':'Offline'}</td></tr>`;
                     }).join('');
                 } else {
-                    membersHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent members</td></tr>';
+                    memHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent members</td></tr>';
                 }
-            } catch (err) {
-                membersHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent info</td></tr>';
+            } catch {
+                memHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent info</td></tr>';
             }
             warContent.innerHTML = `
                 <div style="margin-bottom:20px;">
-                    <strong>Opponent:</strong> ${escapeHtml(opponentName)} ${escapeHtml(opponentTag)}<br>
-                    <strong>Score:</strong> Us ${war.score || 0} - ${war.target_score || 0} Them<br>
+                    <strong>Opponent:</strong> ${escapeHtml(oppName)} ${escapeHtml(oppTag)}<br>
+                    <strong>Score:</strong> Us ${war.score||0} - ${war.target_score||0} Them<br>
                     <strong>Ends:</strong> ${formatTime(war.end)}
                 </div>
                 <div class="war-opponent-members">
                     <h3>Opponent Members & Status</h3>
-                    <table>
-                        <thead><tr><th>Name</th><th>Level</th><th>Status</th></tr></thead>
-                        <tbody>${membersHtml}</tbody>
-                    </table>
+                    <table><thead><tr><th>Name</th><th>Level</th><th>Status</th></tr></thead><tbody>${memHtml}</tbody></table>
                 </div>
             `;
         }
 
         function renderAnnouncementView() {
-            if (factionData && factionData.announcement && factionData.announcement.text) {
+            if (factionData?.announcement?.text) {
                 announcementContent.textContent = factionData.announcement.text;
             } else {
                 announcementContent.textContent = 'No announcement';
             }
         }
 
-        // ---------- Events ----------
-        navBtns.forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
-
+        // Event listeners
+        navBtns.forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
         saveKeyBtn.addEventListener('click', () => {
-            const newKey = apiKeyInput.value.trim();
-            if (!newKey) return alert('Key cannot be empty');
-            apiKey = newKey;
+            const k = apiKeyInput.value.trim();
+            if (!k) return alert('Key cannot be empty');
+            apiKey = k;
             localStorage.setItem('torn_api_key', apiKey);
-            loadAllData();
+            loadAll();
         });
-
-        refreshBtn.addEventListener('click', () => loadAllData());
-
-        changeKeyBtn.addEventListener('click', () => {
-            apiBar.classList.remove('hidden');
-            apiKeyInput.focus();
-        });
-
+        refreshBtn.addEventListener('click', () => loadAll());
+        changeKeyBtn.addEventListener('click', () => { apiBar.classList.remove('hidden'); apiKeyInput.focus(); });
         addTargetBtn.addEventListener('click', addTarget);
-        newTargetInput.addEventListener('keypress', e => { if (e.key === 'Enter') addTarget(); });
+        newTargetInput.addEventListener('keypress', e => { if (e.key==='Enter') addTarget(); });
 
-        // ---------- Init ----------
+        // Init
         apiKeyInput.value = apiKey;
         renderTargets();
-
-        loadAllData(false).then(success => {
-            if (!success) apiBar.classList.remove('hidden');
-        });
-
-        // Auto refresh (basic + members only, war is loaded on demand)
-        setInterval(() => loadAllData(false), 30000);
+        loadAll(false).then(success => { if (!success) apiBar.classList.remove('hidden'); });
+        setInterval(() => loadAll(false), 30000);
     </script>
 </body>
 </html>
