@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torn 帮派主页</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a1a;
+            color: #ddd;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .faction-logo {
+            max-width: 300px;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            background: #2a2a2a;
+            object-fit: contain;
+        }
+        .faction-name {
+            font-size: 2.5rem;
+            margin-top: 15px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255,215,0,0.3);
+        }
+        .faction-tag {
+            font-size: 1.2rem;
+            color: #aaa;
+        }
+        .settings-bar {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .settings-bar input {
+            padding: 8px 15px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #eee;
+            border-radius: 5px;
+            width: 280px;
+        }
+        .settings-bar button {
+            padding: 8px 20px;
+            background: #c0392b;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .settings-bar button:hover { background: #e74c3c; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .card {
+            background: #252525;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            border: 1px solid #333;
+        }
+        .card h2 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: #f1c40f;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+        .member-table, .target-table, .war-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .member-table th, .member-table td,
+        .target-table th, .target-table td,
+        .war-table th, .war-table td {
+            padding: 8px 5px;
+            border-bottom: 1px solid #333;
+            text-align: left;
+        }
+        .online {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+        .offline {
+            color: #7f8c8d;
+        }
+        .add-target {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .add-target input {
+            flex: 1;
+            padding: 6px;
+            background: #333;
+            border: 1px solid #555;
+            color: #ddd;
+            border-radius: 4px;
+        }
+        .add-target button, .delete-btn {
+            background: #2980b9;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .delete-btn {
+            background: #c0392b;
+            padding: 3px 8px;
+            font-size: 0.8rem;
+        }
+        .announcement-box {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-style: italic;
+            color: #ccc;
+        }
+        .no-data {
+            color: #888;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+        .refresh-info {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 20px;
+        }
+        .war-opponent-members {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img id="factionLogo" class="faction-logo" src="" alt="派系Logo" style="display:none;">
+        <div class="faction-name" id="factionName">加载中...</div>
+        <div class="faction-tag" id="factionTag"></div>
+    </div>
+
+    <div class="settings-bar">
+        <input type="text" id="apiKeyInput" placeholder="输入 Torn API Key">
+        <button id="saveKeyBtn">💾 保存 Key</button>
+        <button id="refreshBtn">🔄 刷新数据</button>
+    </div>
+
+    <div class="grid">
+        <!-- 目标清单 -->
+        <div class="card">
+            <h2>🎯 目标清单</h2>
+            <div class="add-target">
+                <input type="text" id="newTargetInput" placeholder="输入目标名称或ID">
+                <button id="addTargetBtn">添加</button>
+            </div>
+            <table class="target-table">
+                <thead><tr><th>目标</th><th>操作</th></tr></thead>
+                <tbody id="targetListBody"></tbody>
+            </table>
+        </div>
+
+        <!-- 成员列表 -->
+        <div class="card">
+            <h2>👥 成员列表与状态</h2>
+            <table class="member-table">
+                <thead><tr><th>姓名</th><th>等级</th><th>职位</th><th>状态</th></tr></thead>
+                <tbody id="memberListBody"></tbody>
+            </table>
+        </div>
+
+        <!-- 帮派战 -->
+        <div class="card">
+            <h2>⚔️ 帮派战</h2>
+            <div id="warContent"></div>
+        </div>
+
+        <!-- 公告栏 -->
+        <div class="card">
+            <h2>📢 派系公告栏</h2>
+            <div id="announcementContent" class="announcement-box">加载中...</div>
+        </div>
+    </div>
+
+    <div class="refresh-info">数据每 30 秒自动刷新 | <span id="lastUpdate"></span></div>
+
+    <script>
+        // ---------- 请将你的 API KEY 写在下面（公开仓库仍建议用输入框覆盖） ----------
+        const DEFAULT_API_KEY = '你的APIKEY';   // 直接替换为自己的 key
+
+        // ---------- 全局变量 ----------
+        let apiKey = localStorage.getItem('torn_api_key') || DEFAULT_API_KEY;
+        let factionData = null;
+        let opponentFactionData = null;
+        let activeWar = null;
+
+        // ---------- DOM 元素 ----------
+        const factionLogo = document.getElementById('factionLogo');
+        const factionName = document.getElementById('factionName');
+        const factionTag = document.getElementById('factionTag');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const saveKeyBtn = document.getElementById('saveKeyBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const targetListBody = document.getElementById('targetListBody');
+        const newTargetInput = document.getElementById('newTargetInput');
+        const addTargetBtn = document.getElementById('addTargetBtn');
+        const memberListBody = document.getElementById('memberListBody');
+        const warContent = document.getElementById('warContent');
+        const announcementContent = document.getElementById('announcementContent');
+        const lastUpdateSpan = document.getElementById('lastUpdate');
+
+        // ---------- 工具函数 ----------
+        function formatTime(timestamp) {
+            if (!timestamp) return '未知';
+            const d = new Date(timestamp * 1000);
+            return d.toLocaleString('zh-CN');
+        }
+
+        function isOnline(lastActionTimestamp) {
+            if (!lastActionTimestamp) return false;
+            const now = Math.floor(Date.now() / 1000);
+            return (now - lastActionTimestamp) < 300; // 5分钟内视为在线
+        }
+
+        // ---------- 目标列表（本地存储） ----------
+        function getTargets() {
+            const raw = localStorage.getItem('torn_targets');
+            return raw ? JSON.parse(raw) : [];
+        }
+
+        function saveTargets(targets) {
+            localStorage.setItem('torn_targets', JSON.stringify(targets));
+        }
+
+        function renderTargets() {
+            const targets = getTargets();
+            targetListBody.innerHTML = '';
+            if (targets.length === 0) {
+                targetListBody.innerHTML = '<tr><td colspan="2" class="no-data">暂无目标</td></tr>';
+                return;
+            }
+            targets.forEach((target, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHtml(target)}</td>
+                    <td><button class="delete-btn" data-index="${index}">删除</button></td>
+                `;
+                targetListBody.appendChild(tr);
+            });
+            // 绑定删除事件
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.index);
+                    const targets = getTargets();
+                    targets.splice(idx, 1);
+                    saveTargets(targets);
+                    renderTargets();
+                });
+            });
+        }
+
+        function addTarget() {
+            const val = newTargetInput.value.trim();
+            if (!val) return;
+            const targets = getTargets();
+            targets.push(val);
+            saveTargets(targets);
+            newTargetInput.value = '';
+            renderTargets();
+        }
+
+        function escapeHtml(text) {
+            return String(text).replace(/[&<>"']/g, function(m) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+            });
+        }
+
+        // ---------- API 请求 ----------
+        async function fetchFactionData() {
+            if (!apiKey || apiKey === '你的APIKEY') {
+                alert('请先输入有效的 Torn API Key！');
+                return;
+            }
+            try {
+                const url = `https://api.torn.com/faction/?selections=basic,members,wars,announcement&key=${apiKey}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                factionData = await response.json();
+                if (factionData.error) throw new Error(factionData.error.error);
+                renderBasicInfo();
+                renderMembers();
+                renderAnnouncement();
+                await checkWarAndRender();
+                lastUpdateSpan.textContent = '最后更新：' + new Date().toLocaleTimeString('zh-CN');
+            } catch (err) {
+                console.error('获取派系数据失败:', err);
+                alert('获取派系数据失败: ' + err.message);
+            }
+        }
+
+        async function fetchOpponentFaction(factionId) {
+            try {
+                const url = `https://api.torn.com/faction/${factionId}?selections=basic,members&key=${apiKey}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                opponentFactionData = await response.json();
+                if (opponentFactionData.error) throw new Error(opponentFactionData.error.error);
+            } catch (err) {
+                console.error('获取对手派系数据失败:', err);
+                opponentFactionData = null;
+            }
+        }
+
+        // ---------- 界面渲染 ----------
+        function renderBasicInfo() {
+            const basic = factionData;
+            if (basic.ID) {
+                factionLogo.src = `https://www.torn.com/images/factions/logo/${basic.ID}.png`;
+                factionLogo.style.display = 'block';
+                factionLogo.onerror = function() { this.style.display = 'none'; };
+            }
+            factionName.textContent = basic.name || '未知派系';
+            factionTag.textContent = basic.tag ? `[${basic.tag}]` : '';
+            document.title = (basic.name || 'Torn帮派') + ' - 帮派主页';
+        }
+
+        function renderMembers() {
+            if (!factionData || !factionData.members) {
+                memberListBody.innerHTML = '<tr><td colspan="4" class="no-data">无成员数据</td></tr>';
+                return;
+            }
+            const members = factionData.members;
+            // 转换为数组并按在线状态、等级排序（在线优先，等级降序）
+            const memberArray = Object.entries(members).map(([id, m]) => ({id, ...m}));
+            memberArray.sort((a, b) => {
+                const aOnline = isOnline(a.last_action?.timestamp);
+                const bOnline = isOnline(b.last_action?.timestamp);
+                if (aOnline && !bOnline) return -1;
+                if (!aOnline && bOnline) return 1;
+                return (b.level || 0) - (a.level || 0);
+            });
+
+            memberListBody.innerHTML = memberArray.map(m => {
+                const online = isOnline(m.last_action?.timestamp);
+                const status = online ? '<span class="online">● 在线</span>' : '<span class="offline">○ 离线</span>';
+                const position = m.position || '成员';
+                return `<tr>
+                    <td>${escapeHtml(m.name)}</td>
+                    <td>${m.level}</td>
+                    <td>${escapeHtml(position)}</td>
+                    <td>${status}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function checkWarAndRender() {
+            if (!factionData || !factionData.wars) {
+                warContent.innerHTML = '<div class="no-data">暂无帮派战数据</div>';
+                activeWar = null;
+                return;
+            }
+            // 寻找进行中的战争（status === "active"）
+            const wars = factionData.wars;
+            activeWar = Object.values(wars).find(w => w.status === 'active');
+            
+            if (!activeWar) {
+                warContent.innerHTML = '<div class="no-data">目前无帮派战 ⚔️</div>';
+                return;
+            }
+
+            // 有活跃战争
+            const opponentId = activeWar.target;
+            // 请求对手信息
+            await fetchOpponentFaction(opponentId);
+            
+            let opponentName = opponentId;
+            let opponentTag = '';
+            let opponentMembersHtml = '';
+
+            if (opponentFactionData && !opponentFactionData.error) {
+                opponentName = opponentFactionData.name || opponentId;
+                opponentTag = opponentFactionData.tag ? `[${opponentFactionData.tag}]` : '';
+                if (opponentFactionData.members) {
+                    const mems = Object.values(opponentFactionData.members);
+                    opponentMembersHtml = mems.map(m => {
+                        const online = isOnline(m.last_action?.timestamp);
+                        return `<tr>
+                            <td>${escapeHtml(m.name)}</td>
+                            <td>${m.level}</td>
+                            <td class="${online ? 'online' : 'offline'}">${online ? '在线' : '离线'}</td>
+                        </tr>`;
+                    }).join('');
+                } else {
+                    opponentMembersHtml = '<tr><td colspan="3" class="no-data">无法获取对手成员</td></tr>';
+                }
+            } else {
+                opponentMembersHtml = '<tr><td colspan="3" class="no-data">无法获取对手信息</td></tr>';
+            }
+
+            const score = activeWar.score || 0;
+            const targetScore = activeWar.target_score || 0;
+            const endTime = activeWar.end ? formatTime(activeWar.end) : '未知';
+
+            warContent.innerHTML = `
+                <div style="margin-bottom:15px;">
+                    <strong>对手派系：</strong>${escapeHtml(opponentName)} ${escapeHtml(opponentTag)}<br>
+                    <strong>比分：</strong>我们 ${score} - ${targetScore} 对手<br>
+                    <strong>结束时间：</strong>${endTime}
+                </div>
+                <div class="war-opponent-members">
+                    <h3>对手成员列表及状态</h3>
+                    <table class="member-table">
+                        <thead><tr><th>姓名</th><th>等级</th><th>状态</th></tr></thead>
+                        <tbody>${opponentMembersHtml}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function renderAnnouncement() {
+            if (factionData && factionData.announcement && factionData.announcement.text) {
+                announcementContent.textContent = factionData.announcement.text;
+            } else {
+                announcementContent.textContent = '暂无公告';
+            }
+        }
+
+        // ---------- 初始化与事件绑定 ----------
+        function initUI() {
+            apiKeyInput.value = apiKey;
+            renderTargets();
+            
+            saveKeyBtn.addEventListener('click', () => {
+                const newKey = apiKeyInput.value.trim();
+                if (!newKey) {
+                    alert('Key 不能为空');
+                    return;
+                }
+                apiKey = newKey;
+                localStorage.setItem('torn_api_key', apiKey);
+                alert('API Key 已保存！');
+                fetchFactionData();
+            });
+
+            refreshBtn.addEventListener('click', fetchFactionData);
+            addTargetBtn.addEventListener('click', addTarget);
+            newTargetInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addTarget();
+            });
+
+            // 自动刷新 (30秒)
+            setInterval(fetchFactionData, 30000);
+        }
+
+        // 启动
+        initUI();
+        fetchFactionData();
+    </script>
+</body>
+</html>
