@@ -22,7 +22,7 @@
             border: 1px solid #30363d;
             border-radius: 8px;
             padding: 16px;
-            max-width: 520px;
+            max-width: 580px;
             margin: 0 auto 20px;
             display: flex;
             gap: 10px;
@@ -51,11 +51,18 @@
         .login-panel button:hover { background: #2ea043; }
         .user-badge {
             text-align: center;
-            margin-bottom: 16px;
+            margin-bottom: 8px;
             font-size: 0.9rem;
             color: #8b949e;
         }
         .user-badge strong { color: #f0c040; }
+        .status-indicator {
+            text-align: center;
+            margin-bottom: 12px;
+            font-size: 1rem;
+        }
+        .status-online { color: #3fb950; font-weight: bold; }
+        .status-offline { color: #f85149; font-weight: bold; }
 
         .grid-container {
             overflow-x: auto;
@@ -114,6 +121,16 @@
             color: #484f58;
             margin-top: 10px;
         }
+        .manual-refresh {
+            display: block;
+            margin: 0 auto 10px;
+            padding: 6px 16px;
+            background: #30363d;
+            border: 1px solid #58a6ff;
+            color: #58a6ff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -128,19 +145,25 @@
         Signed in as <strong id="userNameDisplay"></strong> (ID: <strong id="userIdDisplay"></strong>)
     </div>
 
+    <div id="onlineStatus" class="status-indicator" style="display:none;">
+        Current Torn status: <span id="statusText"></span>
+        <br><small id="lastActionInfo"></small>
+    </div>
+
+    <button id="manualRefreshBtn" class="manual-refresh">🔄 Refresh Grid Now</button>
+
     <div class="legend"><span>Online (last 5 min)</span></div>
 
     <div class="grid-container" id="gridContainer">
         <p style="text-align:center;padding:30px;color:#8b949e;">Sign in with your Torn API key to view the live grid.</p>
     </div>
-    <div class="refresh-note">Updates automatically every 30 seconds</div>
+    <div class="refresh-note">Auto‑checks every 30 seconds</div>
 
     <script>
-        // ========== 你的 Supabase 凭证（已写死） ==========
+        // ========== Supabase 配置 ==========
         const SUPABASE_URL = 'https://ohgvzzcojnjqzvyizyxs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M';
 
-        // ---------- 全局变量 ----------
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const SLOTS = 48;
         const ONLINE_THRESHOLD_SEC = 300;
@@ -149,13 +172,19 @@
         let pollInterval = null;
         let gridRefreshInterval = null;
 
+        // DOM elements
         const apiKeyInput = document.getElementById('apiKeyInput');
         const loginBtn = document.getElementById('loginBtn');
         const userBadge = document.getElementById('userBadge');
         const userNameDisplay = document.getElementById('userNameDisplay');
         const userIdDisplay = document.getElementById('userIdDisplay');
+        const onlineStatusDiv = document.getElementById('onlineStatus');
+        const statusText = document.getElementById('statusText');
+        const lastActionInfo = document.getElementById('lastActionInfo');
         const gridContainer = document.getElementById('gridContainer');
+        const manualRefreshBtn = document.getElementById('manualRefreshBtn');
 
+        // ---------- 工具函数 ----------
         function getCurrentWeekDates() {
             const now = new Date();
             const day = now.getDay();
@@ -174,29 +203,41 @@
             return `${h}:${m}`;
         }
 
-        // Torn API
+        // ---------- Torn API（增强日志） ----------
         async function verifyTornKey(key) {
+            console.log('[Torn] Verifying key...');
             try {
                 const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error.error);
+                console.log('[Torn] Verified user:', data.name, 'ID:', data.player_id);
                 return { id: data.player_id, name: data.name };
             } catch (err) {
-                console.error('[ERROR] Torn verification:', err);
+                console.error('[Torn] Key verification failed:', err);
                 return null;
             }
         }
 
-        async function isUserOnline(key) {
+        // 返回在线状态对象，方便调试
+        async function checkOnlineStatus(key) {
             try {
                 const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                 const data = await res.json();
-                if (data.error) return false;
-                const last = data.last_action?.timestamp;
-                if (!last) return false;
-                const now = Math.floor(Date.now() / 1000);
-                return (now - last) < ONLINE_THRESHOLD_SEC;
-            } catch { return false; }
+                if (data.error) return { online: false, lastAction: null, secondsAgo: null };
+
+                const lastTimestamp = data.last_action?.timestamp;
+                if (!lastTimestamp) return { online: false, lastAction: null, secondsAgo: null };
+
+                const nowSec = Math.floor(Date.now() / 1000);
+                const secondsAgo = nowSec - lastTimestamp;
+                const online = secondsAgo < ONLINE_THRESHOLD_SEC;
+
+                console.log(`[Torn] Online check: ${online ? 'ONLINE' : 'OFFLINE'}, last action ${secondsAgo}s ago`);
+                return { online, lastAction: lastTimestamp, secondsAgo };
+            } catch (err) {
+                console.error('[Torn] Online check error:', err);
+                return { online: false, lastAction: null, secondsAgo: null };
+            }
         }
 
         function getCurrentDateAndSlot() {
@@ -205,10 +246,11 @@
             const hours = now.getUTCHours();
             const minutes = now.getUTCMinutes();
             const slot = hours * 2 + (minutes >= 30 ? 1 : 0);
+            console.log(`[Time] Current UTC: ${dateStr} ${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')} → slot ${slot}`);
             return { date: dateStr, slot };
         }
 
-        // Supabase REST helpers
+        // ---------- Supabase REST ----------
         function supabaseHeaders() {
             return {
                 'apikey': SUPABASE_ANON_KEY,
@@ -220,93 +262,82 @@
         async function upsertPresence(userId, date, slot, timestamp) {
             const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
-            if (!res.ok) {
-                const err = await res.json();
-                console.error('[ERROR] Check presence failed:', err);
-                alert('Supabase query failed: ' + (err.message || JSON.stringify(err)));
-                return;
-            }
+            if (!res.ok) { console.error('Check failed', res.status); return; }
             const existing = await res.json();
 
-            if (existing && existing.length > 0) {
+            if (existing.length > 0) {
                 const id = existing[0].id;
                 const updateUrl = `${SUPABASE_URL}/rest/v1/presence?id=eq.${id}`;
                 res = await fetch(updateUrl, {
                     method: 'PATCH',
                     headers: supabaseHeaders(),
-                    body: JSON.stringify({ timestamp: timestamp })
+                    body: JSON.stringify({ timestamp })
                 });
-                if (!res.ok) {
-                    const err = await res.json();
-                    console.error('[ERROR] Update failed:', err);
-                    alert('Supabase update failed: ' + (err.message || JSON.stringify(err)));
-                }
+                if (res.ok) console.log('[Supabase] Updated presence');
+                else console.error('[Supabase] Update failed', await res.json());
             } else {
                 const insertUrl = `${SUPABASE_URL}/rest/v1/presence`;
                 res = await fetch(insertUrl, {
                     method: 'POST',
                     headers: supabaseHeaders(),
-                    body: JSON.stringify({
-                        user_id: userId,
-                        date: date,
-                        slot: slot,
-                        timestamp: timestamp
-                    })
+                    body: JSON.stringify({ user_id: userId, date, slot, timestamp })
                 });
-                if (!res.ok) {
-                    const err = await res.json();
-                    console.error('[ERROR] Insert failed:', err);
-                    alert('Supabase insert failed: ' + (err.message || JSON.stringify(err)));
-                }
+                if (res.ok) console.log('[Supabase] Inserted new presence');
+                else console.error('[Supabase] Insert failed', await res.json());
             }
         }
 
         async function deletePresence(userId, date, slot) {
             const url = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}`;
-            const res = await fetch(url, {
-                method: 'DELETE',
-                headers: supabaseHeaders()
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                console.error('[ERROR] Delete failed:', err);
-                alert('Supabase delete failed: ' + (err.message || JSON.stringify(err)));
-            }
+            const res = await fetch(url, { method: 'DELETE', headers: supabaseHeaders() });
+            if (res.ok) console.log('[Supabase] Deleted presence');
+            else console.error('[Supabase] Delete failed', await res.json());
         }
 
         async function fetchPresence(dates, cutoffTimestamp) {
             const dateList = dates.map(d => `"${d}"`).join(',');
             const url = `${SUPABASE_URL}/rest/v1/presence?date=in.(${encodeURIComponent(dateList)})&timestamp=gt.${cutoffTimestamp}&select=*`;
             const res = await fetch(url, { headers: supabaseHeaders() });
-            if (!res.ok) {
-                const err = await res.json();
-                console.error('[ERROR] Fetch presence failed:', err);
-                alert('Supabase read failed: ' + (err.message || JSON.stringify(err)));
-                return [];
-            }
+            if (!res.ok) { console.error('Fetch presence failed', await res.json()); return []; }
             return await res.json();
         }
 
+        // ---------- 更新自己的在线状态（带 UI 反馈） ----------
         async function updateMyPresence() {
             if (!currentUser) return;
             const savedKey = localStorage.getItem('torn_api_key');
             if (!savedKey) return;
 
-            const online = await isUserOnline(savedKey);
+            console.log('\n⏱ Running presence update...');
+            const status = await checkOnlineStatus(savedKey);
+
+            // 更新 UI 状态指示器
+            onlineStatusDiv.style.display = 'block';
+            if (status.online) {
+                statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
+                lastActionInfo.textContent = `Last action ${status.secondsAgo}s ago`;
+            } else {
+                statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
+                if (status.secondsAgo !== null) lastActionInfo.textContent = `Last action ${status.secondsAgo}s ago`;
+                else lastActionInfo.textContent = 'Cannot determine last action';
+            }
+
             const { date, slot } = getCurrentDateAndSlot();
             const now = Date.now();
 
-            if (online) {
+            if (status.online) {
                 await upsertPresence(currentUser.id, date, slot, now);
+                console.log(`✅ Marked online at slot ${slot}`);
             } else {
                 await deletePresence(currentUser.id, date, slot);
+                console.log(`❌ Removed from slot ${slot}`);
             }
         }
 
+        // ---------- 加载并渲染网格 ----------
         async function loadAndRenderGrid() {
             const dates = getCurrentWeekDates();
             const cutoff = Date.now() - ONLINE_THRESHOLD_SEC * 1000;
-
             const data = await fetchPresence(dates, cutoff);
 
             const cellMap = {};
@@ -342,17 +373,14 @@
             gridContainer.innerHTML = html;
         }
 
+        // ---------- 登录流程 ----------
         async function handleLogin() {
             const key = apiKeyInput.value.trim();
-            if (!key) {
-                alert('Please enter your Torn API key');
-                return;
-            }
+            if (!key) return alert('Please enter your Torn API key');
 
-            console.log('[DEBUG] Login button clicked');
             const user = await verifyTornKey(key);
             if (!user) {
-                alert('Invalid Torn API key. Please try again.');
+                alert('Invalid Torn API key.');
                 return;
             }
 
@@ -363,26 +391,31 @@
             userIdDisplay.textContent = user.id;
             loginBtn.textContent = '🔄 Signed in';
 
+            // 清除旧定时器
             if (pollInterval) clearInterval(pollInterval);
             if (gridRefreshInterval) clearInterval(gridRefreshInterval);
 
+            // 立即执行一次
             await updateMyPresence();
-            pollInterval = setInterval(updateMyPresence, 30000);
-
             await loadAndRenderGrid();
+
+            // 每30秒自动检查
+            pollInterval = setInterval(updateMyPresence, 30000);
             gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
         }
 
-        // 确保按钮绑定
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                loginBtn.addEventListener('click', handleLogin);
-                console.log('[DEBUG] Login event bound');
-            });
-        } else {
-            loginBtn.addEventListener('click', handleLogin);
-            console.log('[DEBUG] Login event bound');
-        }
+        // 手动刷新
+        manualRefreshBtn.addEventListener('click', async () => {
+            if (currentUser) {
+                await updateMyPresence();
+                await loadAndRenderGrid();
+            } else {
+                alert('Please sign in first.');
+            }
+        });
+
+        // 绑定登录事件
+        loginBtn.addEventListener('click', handleLogin);
 
         // 自动登录
         (async () => {
@@ -397,8 +430,8 @@
                     userIdDisplay.textContent = user.id;
                     loginBtn.textContent = '🔄 Signed in';
                     await updateMyPresence();
-                    pollInterval = setInterval(updateMyPresence, 30000);
                     await loadAndRenderGrid();
+                    pollInterval = setInterval(updateMyPresence, 30000);
                     gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
                 }
             }
