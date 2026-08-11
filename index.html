@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Torn Live Online Grid</title>
+    <title>Torn Weekly Online Schedule</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -12,129 +12,59 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             padding: 20px;
         }
-        h1 {
-            text-align: center;
-            color: #58a6ff;
-            margin-bottom: 12px;
-        }
+        h1 { text-align: center; color: #58a6ff; margin-bottom: 12px; }
         .login-panel {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 16px;
-            max-width: 580px;
-            margin: 0 auto 20px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            padding: 16px; max-width: 580px; margin: 0 auto 20px;
+            display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;
         }
         .login-panel input {
-            flex: 1;
-            padding: 8px 12px;
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            color: #f0f6fc;
-            min-width: 200px;
+            flex: 1; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d;
+            border-radius: 6px; color: #f0f6fc; min-width: 200px;
         }
         .login-panel button {
-            padding: 8px 18px;
-            background: #238636;
-            border: 1px solid #2ea043;
-            border-radius: 6px;
-            color: white;
-            cursor: pointer;
-            font-weight: 600;
+            padding: 8px 18px; background: #238636; border: 1px solid #2ea043;
+            border-radius: 6px; color: white; cursor: pointer; font-weight: 600;
         }
-        .login-panel button:hover { background: #2ea043; }
         .user-badge {
-            text-align: center;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-            color: #8b949e;
+            text-align: center; margin-bottom: 8px; font-size: 0.9rem; color: #8b949e;
         }
         .user-badge strong { color: #f0c040; }
         .status-indicator {
-            text-align: center;
-            margin-bottom: 12px;
-            font-size: 1rem;
+            text-align: center; margin-bottom: 12px; font-size: 1.1rem;
         }
         .status-online { color: #3fb950; font-weight: bold; }
         .status-offline { color: #f85149; font-weight: bold; }
-
         .grid-container {
-            overflow-x: auto;
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 10px;
+            overflow-x: auto; background: #161b22; border: 1px solid #30363d;
+            border-radius: 8px; padding: 10px;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 900px;
-            table-layout: fixed;
-        }
-        th, td {
-            border: 1px solid #21262d;
-            padding: 4px 2px;
-            text-align: center;
-            font-size: 0.7rem;
-            height: 28px;
-            vertical-align: middle;
-        }
-        th {
-            background: #21262d;
-            color: #58a6ff;
-            position: sticky;
-            top: 0;
-            z-index: 3;
-        }
+        table { width: 100%; border-collapse: collapse; min-width: 900px; table-layout: fixed; }
+        th, td { border: 1px solid #21262d; padding: 4px 2px; text-align: center; font-size: 0.7rem; height: 28px; }
+        th { background: #21262d; color: #58a6ff; position: sticky; top: 0; z-index: 3; }
         .time-header { font-size: 0.65rem; white-space: nowrap; }
-        td.online {
+        td.marked {
             background: rgba(88, 166, 255, 0.15);
             color: #58a6ff;
             font-weight: bold;
         }
-        td.online::after {
+        td.marked::after {
             content: attr(data-count);
             font-size: 0.65rem;
             margin-left: 2px;
         }
-        .legend {
-            display: flex;
-            justify-content: center;
-            gap: 18px;
-            margin: 10px 0 15px;
-            font-size: 0.8rem;
-        }
-        .legend span::before {
-            content: '■';
-            margin-right: 5px;
-            color: rgba(88, 166, 255, 0.15);
-        }
-        .refresh-note {
-            text-align: center;
-            font-size: 0.75rem;
-            color: #484f58;
-            margin-top: 10px;
-        }
+        .legend { display: flex; justify-content: center; gap: 18px; margin: 10px 0 15px; font-size: 0.8rem; }
+        .legend span::before { content: '■'; margin-right: 5px; color: rgba(88, 166, 255, 0.15); }
+        .refresh-note { text-align: center; font-size: 0.75rem; color: #484f58; margin-top: 10px; }
         .manual-refresh {
-            display: block;
-            margin: 0 auto 10px;
-            padding: 6px 16px;
-            background: #30363d;
-            border: 1px solid #58a6ff;
-            color: #58a6ff;
-            border-radius: 4px;
-            cursor: pointer;
+            display: block; margin: 0 auto 10px; padding: 6px 16px;
+            background: #30363d; border: 1px solid #58a6ff; color: #58a6ff;
+            border-radius: 4px; cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <h1>🕒 Torn Live Online Grid</h1>
+    <h1>📅 Torn Weekly Online Schedule</h1>
 
     <div class="login-panel">
         <input type="text" id="apiKeyInput" placeholder="Paste your Torn API key">
@@ -152,39 +82,28 @@
 
     <button id="manualRefreshBtn" class="manual-refresh">🔄 Refresh Grid Now</button>
 
-    <div class="legend"><span>Online (last 5 min)</span></div>
+    <div class="legend"><span>Marked online this week</span></div>
 
     <div class="grid-container" id="gridContainer">
-        <p style="text-align:center;padding:30px;color:#8b949e;">Sign in with your Torn API key to view the live grid.</p>
+        <p style="text-align:center;padding:30px;color:#8b949e;">Sign in to see the schedule.</p>
     </div>
-    <div class="refresh-note">Auto‑checks every 30 seconds</div>
+    <div class="refresh-note">Auto‑checks every 15 seconds · Marks persist all week</div>
 
     <script>
-        // ========== Supabase 配置 ==========
+        // ========== SUPABASE CONFIG ==========
         const SUPABASE_URL = 'https://ohgvzzcojnjqzvyizyxs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M';
 
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const SLOTS = 48;
-        const ONLINE_THRESHOLD_SEC = 300;
+        const SLOTS = 48; // half‑hour slots
+        const ONLINE_THRESHOLD_SEC = 300; // 5 minutes
+        const CHECK_INTERVAL = 15000; // 15 seconds
 
         let currentUser = null;
         let pollInterval = null;
         let gridRefreshInterval = null;
 
-        // DOM elements
-        const apiKeyInput = document.getElementById('apiKeyInput');
-        const loginBtn = document.getElementById('loginBtn');
-        const userBadge = document.getElementById('userBadge');
-        const userNameDisplay = document.getElementById('userNameDisplay');
-        const userIdDisplay = document.getElementById('userIdDisplay');
-        const onlineStatusDiv = document.getElementById('onlineStatus');
-        const statusText = document.getElementById('statusText');
-        const lastActionInfo = document.getElementById('lastActionInfo');
-        const gridContainer = document.getElementById('gridContainer');
-        const manualRefreshBtn = document.getElementById('manualRefreshBtn');
-
-        // ---------- 工具函数 ----------
+        // ---------- Helpers ----------
         function getCurrentWeekDates() {
             const now = new Date();
             const day = now.getDay();
@@ -203,14 +122,12 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API（增强日志） ----------
+        // ---------- Torn API ----------
         async function verifyTornKey(key) {
-            console.log('[Torn] Verifying key...');
             try {
                 const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error.error);
-                console.log('[Torn] Verified user:', data.name, 'ID:', data.player_id);
                 return { id: data.player_id, name: data.name };
             } catch (err) {
                 console.error('[Torn] Key verification failed:', err);
@@ -218,22 +135,16 @@
             }
         }
 
-        // 返回在线状态对象，方便调试
         async function checkOnlineStatus(key) {
             try {
                 const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                 const data = await res.json();
                 if (data.error) return { online: false, lastAction: null, secondsAgo: null };
-
-                const lastTimestamp = data.last_action?.timestamp;
-                if (!lastTimestamp) return { online: false, lastAction: null, secondsAgo: null };
-
+                const last = data.last_action?.timestamp;
+                if (!last) return { online: false, lastAction: null, secondsAgo: null };
                 const nowSec = Math.floor(Date.now() / 1000);
-                const secondsAgo = nowSec - lastTimestamp;
-                const online = secondsAgo < ONLINE_THRESHOLD_SEC;
-
-                console.log(`[Torn] Online check: ${online ? 'ONLINE' : 'OFFLINE'}, last action ${secondsAgo}s ago`);
-                return { online, lastAction: lastTimestamp, secondsAgo };
+                const secondsAgo = nowSec - last;
+                return { online: secondsAgo < ONLINE_THRESHOLD_SEC, lastAction: last, secondsAgo };
             } catch (err) {
                 console.error('[Torn] Online check error:', err);
                 return { online: false, lastAction: null, secondsAgo: null };
@@ -246,7 +157,6 @@
             const hours = now.getUTCHours();
             const minutes = now.getUTCMinutes();
             const slot = hours * 2 + (minutes >= 30 ? 1 : 0);
-            console.log(`[Time] Current UTC: ${dateStr} ${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')} → slot ${slot}`);
             return { date: dateStr, slot };
         }
 
@@ -259,92 +169,75 @@
             };
         }
 
-        async function upsertPresence(userId, date, slot, timestamp) {
+        async function upsertPresence(userId, date, slot) {
             const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
             if (!res.ok) { console.error('Check failed', res.status); return; }
             const existing = await res.json();
 
-            if (existing.length > 0) {
-                const id = existing[0].id;
-                const updateUrl = `${SUPABASE_URL}/rest/v1/presence?id=eq.${id}`;
-                res = await fetch(updateUrl, {
-                    method: 'PATCH',
-                    headers: supabaseHeaders(),
-                    body: JSON.stringify({ timestamp })
-                });
-                if (res.ok) console.log('[Supabase] Updated presence');
-                else console.error('[Supabase] Update failed', await res.json());
-            } else {
+            if (existing.length === 0) {
                 const insertUrl = `${SUPABASE_URL}/rest/v1/presence`;
                 res = await fetch(insertUrl, {
                     method: 'POST',
                     headers: supabaseHeaders(),
-                    body: JSON.stringify({ user_id: userId, date, slot, timestamp })
+                    body: JSON.stringify({ user_id: userId, date, slot, timestamp: Date.now() })
                 });
-                if (res.ok) console.log('[Supabase] Inserted new presence');
-                else console.error('[Supabase] Insert failed', await res.json());
+                if (res.ok) console.log('[Supabase] Marked slot');
+                else console.error('Insert failed', await res.json());
             }
         }
 
-        async function deletePresence(userId, date, slot) {
-            const url = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}`;
-            const res = await fetch(url, { method: 'DELETE', headers: supabaseHeaders() });
-            if (res.ok) console.log('[Supabase] Deleted presence');
-            else console.error('[Supabase] Delete failed', await res.json());
-        }
-
-        async function fetchPresence(dates, cutoffTimestamp) {
+        async function fetchPresence(dates) {
             const dateList = dates.map(d => `"${d}"`).join(',');
-            const url = `${SUPABASE_URL}/rest/v1/presence?date=in.(${encodeURIComponent(dateList)})&timestamp=gt.${cutoffTimestamp}&select=*`;
+            const url = `${SUPABASE_URL}/rest/v1/presence?date=in.(${encodeURIComponent(dateList)})&select=*`;
             const res = await fetch(url, { headers: supabaseHeaders() });
-            if (!res.ok) { console.error('Fetch presence failed', await res.json()); return []; }
+            if (!res.ok) { console.error('Fetch failed', await res.json()); return []; }
             return await res.json();
         }
 
-        // ---------- 更新自己的在线状态（带 UI 反馈） ----------
+        // ---------- Update presence (only when online) ----------
         async function updateMyPresence() {
             if (!currentUser) return;
             const savedKey = localStorage.getItem('torn_api_key');
             if (!savedKey) return;
 
-            console.log('\n⏱ Running presence update...');
             const status = await checkOnlineStatus(savedKey);
 
-            // 更新 UI 状态指示器
-            onlineStatusDiv.style.display = 'block';
-            if (status.online) {
-                statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
-                lastActionInfo.textContent = `Last action ${status.secondsAgo}s ago`;
-            } else {
-                statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
-                if (status.secondsAgo !== null) lastActionInfo.textContent = `Last action ${status.secondsAgo}s ago`;
-                else lastActionInfo.textContent = 'Cannot determine last action';
+            const statusDiv = document.getElementById('onlineStatus');
+            const statusText = document.getElementById('statusText');
+            const lastActionInfo = document.getElementById('lastActionInfo');
+            if (statusDiv && statusText) {
+                statusDiv.style.display = 'block';
+                if (status.online) {
+                    statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
+                    lastActionInfo.textContent = `Last action ${status.secondsAgo}s ago`;
+                } else {
+                    statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
+                    lastActionInfo.textContent = status.secondsAgo !== null
+                        ? `Last action ${status.secondsAgo}s ago`
+                        : 'Cannot determine last action';
+                }
             }
 
-            const { date, slot } = getCurrentDateAndSlot();
-            const now = Date.now();
-
             if (status.online) {
-                await upsertPresence(currentUser.id, date, slot, now);
+                const { date, slot } = getCurrentDateAndSlot();
+                await upsertPresence(currentUser.id, date, slot);
                 console.log(`✅ Marked online at slot ${slot}`);
             } else {
-                await deletePresence(currentUser.id, date, slot);
-                console.log(`❌ Removed from slot ${slot}`);
+                console.log(`⏸ Offline, no mark removed`);
             }
         }
 
-        // ---------- 加载并渲染网格 ----------
+        // ---------- Load & render grid ----------
         async function loadAndRenderGrid() {
             const dates = getCurrentWeekDates();
-            const cutoff = Date.now() - ONLINE_THRESHOLD_SEC * 1000;
-            const data = await fetchPresence(dates, cutoff);
+            const data = await fetchPresence(dates);
 
             const cellMap = {};
             data.forEach(row => {
-                const cellKey = `${row.date}_${row.slot}`;
-                if (!cellMap[cellKey]) cellMap[cellKey] = [];
-                cellMap[cellKey].push(row.user_id);
+                const key = `${row.date}_${row.slot}`;
+                if (!cellMap[key]) cellMap[key] = new Set();
+                cellMap[key].add(row.user_id);
             });
 
             renderGrid(dates, cellMap);
@@ -361,78 +254,71 @@
                 html += '<tr>';
                 html += `<td class="time-header">${getSlotTime(s)}</td>`;
                 dates.forEach(date => {
-                    const cellKey = `${date}_${s}`;
-                    const users = cellMap[cellKey] || [];
-                    const count = users.length;
-                    const cls = count > 0 ? 'online' : '';
-                    html += `<td class="${cls}" data-count="${count > 1 ? count : ''}"></td>`;
+                    const key = `${date}_${s}`;
+                    const users = cellMap[key]?.size || 0;
+                    const cls = users > 0 ? 'marked' : '';
+                    html += `<td class="${cls}" data-count="${users > 1 ? users : ''}"></td>`;
                 });
                 html += '</tr>';
             }
             html += '</tbody></table>';
-            gridContainer.innerHTML = html;
+            document.getElementById('gridContainer').innerHTML = html;
         }
 
-        // ---------- 登录流程 ----------
+        // ---------- Login ----------
         async function handleLogin() {
-            const key = apiKeyInput.value.trim();
+            const key = document.getElementById('apiKeyInput').value.trim();
             if (!key) return alert('Please enter your Torn API key');
 
             const user = await verifyTornKey(key);
-            if (!user) {
-                alert('Invalid Torn API key.');
-                return;
-            }
+            if (!user) return alert('Invalid API key.');
 
             currentUser = user;
             localStorage.setItem('torn_api_key', key);
-            userBadge.style.display = 'block';
-            userNameDisplay.textContent = user.name;
-            userIdDisplay.textContent = user.id;
-            loginBtn.textContent = '🔄 Signed in';
+            document.getElementById('userBadge').style.display = 'block';
+            document.getElementById('userNameDisplay').textContent = user.name;
+            document.getElementById('userIdDisplay').textContent = user.id;
+            document.getElementById('loginBtn').textContent = '🔄 Signed in';
 
-            // 清除旧定时器
             if (pollInterval) clearInterval(pollInterval);
             if (gridRefreshInterval) clearInterval(gridRefreshInterval);
 
-            // 立即执行一次
             await updateMyPresence();
             await loadAndRenderGrid();
 
-            // 每30秒自动检查
-            pollInterval = setInterval(updateMyPresence, 30000);
-            gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
+            pollInterval = setInterval(updateMyPresence, CHECK_INTERVAL);
+            gridRefreshInterval = setInterval(loadAndRenderGrid, CHECK_INTERVAL);
         }
 
-        // 手动刷新
-        manualRefreshBtn.addEventListener('click', async () => {
-            if (currentUser) {
+        // ---------- Bind events ----------
+        function bindEvents() {
+            document.getElementById('loginBtn').addEventListener('click', handleLogin);
+            document.getElementById('manualRefreshBtn').addEventListener('click', async () => {
+                if (!currentUser) return alert('Please sign in first.');
                 await updateMyPresence();
                 await loadAndRenderGrid();
-            } else {
-                alert('Please sign in first.');
-            }
-        });
+            });
+        }
 
-        // 绑定登录事件
-        loginBtn.addEventListener('click', handleLogin);
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindEvents);
+        else bindEvents();
 
-        // 自动登录
+        // Auto‑login
         (async () => {
             const savedKey = localStorage.getItem('torn_api_key');
             if (savedKey) {
-                apiKeyInput.value = savedKey;
+                document.getElementById('apiKeyInput').value = savedKey;
                 const user = await verifyTornKey(savedKey);
                 if (user) {
                     currentUser = user;
-                    userBadge.style.display = 'block';
-                    userNameDisplay.textContent = user.name;
-                    userIdDisplay.textContent = user.id;
-                    loginBtn.textContent = '🔄 Signed in';
+                    document.getElementById('userBadge').style.display = 'block';
+                    document.getElementById('userNameDisplay').textContent = user.name;
+                    document.getElementById('userIdDisplay').textContent = user.id;
+                    document.getElementById('loginBtn').textContent = '🔄 Signed in';
                     await updateMyPresence();
                     await loadAndRenderGrid();
-                    pollInterval = setInterval(updateMyPresence, 30000);
-                    gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
+                    pollInterval = setInterval(updateMyPresence, CHECK_INTERVAL);
+                    gridRefreshInterval = setInterval(loadAndRenderGrid, CHECK_INTERVAL);
                 }
             }
         })();
