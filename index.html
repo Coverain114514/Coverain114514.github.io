@@ -65,6 +65,13 @@
             background: #30363d; border: 1px solid #58a6ff; color: #58a6ff;
             border-radius: 4px; cursor: pointer;
         }
+        .error-log {
+            color: #f85149;
+            font-size: 0.8rem;
+            text-align: center;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -72,7 +79,8 @@
 
     <div class="login-panel">
         <input type="text" id="apiKeyInput" placeholder="Paste your Torn API key">
-        <button id="loginBtn">🔑 Sign In</button>
+        <!-- 使用 onclick 绑定，确保点击一定触发 -->
+        <button id="loginBtn" onclick="window.handleLogin()">🔑 Sign In</button>
     </div>
 
     <div id="userBadge" class="user-badge" style="display:none;">
@@ -85,7 +93,7 @@
         <span id="lastActionInfo" class="debug-info"></span>
     </div>
 
-    <button id="manualRefreshBtn" class="manual-refresh">🔄 Refresh Grid Now</button>
+    <button id="manualRefreshBtn" class="manual-refresh" onclick="window.handleManualRefresh()">🔄 Refresh Grid Now</button>
 
     <div class="legend"><span>Marked online this week</span></div>
 
@@ -93,6 +101,7 @@
         <p style="text-align:center;padding:30px;color:#8b949e;">Sign in to see the schedule.</p>
     </div>
     <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
+    <div id="errorLog" class="error-log"></div>
 
     <script>
         // ========== SUPABASE CONFIG ==========
@@ -106,6 +115,19 @@
         let currentUser = null;
         let pollInterval = null;
         let gridRefreshInterval = null;
+
+        // 简单调试输出到页面底部
+        function logToPage(msg) {
+            const el = document.getElementById('errorLog');
+            if (el) el.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        // 清理旧日志
+        function clearLog() {
+            const el = document.getElementById('errorLog');
+            if (el) el.textContent = '';
+        }
 
         // ---------- Helpers ----------
         function getCurrentWeekDates() {
@@ -126,30 +148,28 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API (explicitly request last_action) ----------
+        // ---------- Torn API ----------
         async function verifyTornKey(key) {
             try {
-                const res = await fetch(`https://api.torn.com/user/?selections=basic,last_action&key=${key}`);
+                const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error.error);
                 return { id: data.player_id, name: data.name };
             } catch (err) {
-                console.error('[Torn] Key verification failed:', err);
+                logToPage('[Torn] Key verification failed: ' + err.message);
                 return null;
             }
         }
 
         async function checkOnlineStatus(key) {
             try {
-                // Force basic + last_action selection
-                const url = `https://api.torn.com/user/?selections=basic,last_action&key=${key}`;
-                const res = await fetch(url);
+                const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                 const data = await res.json();
-                if (data.error) return { online: false, lastAction: null, secondsAgo: null, rawData: null };
+                if (data.error) return { online: false, lastAction: null, secondsAgo: null, rawData: data };
 
                 const lastAction = data.last_action;
                 if (!lastAction || !lastAction.timestamp) {
-                    console.warn('[Torn] No last_action in response, full data:', data);
+                    logToPage('[Torn] No last_action in response. Check API key permissions.');
                     return { online: false, lastAction: null, secondsAgo: null, rawData: data };
                 }
 
@@ -159,7 +179,7 @@
                 const online = secondsAgo < ONLINE_THRESHOLD_SEC;
                 return { online, lastAction: timestamp, secondsAgo, rawData: data };
             } catch (err) {
-                console.error('[Torn] Online check error:', err);
+                logToPage('[Torn] Online check error: ' + err.message);
                 return { online: false, lastAction: null, secondsAgo: null, rawData: null };
             }
         }
@@ -183,37 +203,63 @@
         }
 
         async function upsertPresence(userId, date, slot) {
-            const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
-            let res = await fetch(checkUrl, { headers: supabaseHeaders() });
-            if (!res.ok) { console.error('Check failed', res.status); return; }
-            const existing = await res.json();
+            try {
+                const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
+                let res = await fetch(checkUrl, { headers: supabaseHeaders() });
+                if (!res.ok) {
+                    logToPage('[Supabase] Check failed: ' + res.status);
+                    return;
+                }
+                const existing = await res.json();
 
-            if (existing.length === 0) {
-                const insertUrl = `${SUPABASE_URL}/rest/v1/presence`;
-                res = await fetch(insertUrl, {
-                    method: 'POST',
-                    headers: supabaseHeaders(),
-                    body: JSON.stringify({ user_id: userId, date, slot, timestamp: Date.now() })
-                });
-                if (res.ok) console.log('[Supabase] Marked slot');
-                else console.error('Insert failed', await res.json());
+                if (existing.length === 0) {
+                    const insertUrl = `${SUPABASE_URL}/rest/v1/presence`;
+                    res = await fetch(insertUrl, {
+                        method: 'POST',
+                        headers: supabaseHeaders(),
+                        body: JSON.stringify({ user_id: userId, date, slot, timestamp: Date.now() })
+                    });
+                    if (res.ok) logToPage('[Supabase] Marked slot ' + slot);
+                    else {
+                        const err = await res.json();
+                        logToPage('[Supabase] Insert failed: ' + JSON.stringify(err));
+                    }
+                } else {
+                    logToPage('[Supabase] Already marked at slot ' + slot);
+                }
+            } catch (err) {
+                logToPage('[Supabase] upsert error: ' + err.message);
             }
         }
 
         async function fetchPresence(dates) {
-            const dateList = dates.map(d => `"${d}"`).join(',');
-            const url = `${SUPABASE_URL}/rest/v1/presence?date=in.(${encodeURIComponent(dateList)})&select=*`;
-            const res = await fetch(url, { headers: supabaseHeaders() });
-            if (!res.ok) { console.error('Fetch failed', await res.json()); return []; }
-            return await res.json();
+            try {
+                const dateList = dates.map(d => `"${d}"`).join(',');
+                const url = `${SUPABASE_URL}/rest/v1/presence?date=in.(${encodeURIComponent(dateList)})&select=*`;
+                const res = await fetch(url, { headers: supabaseHeaders() });
+                if (!res.ok) {
+                    const err = await res.json();
+                    logToPage('[Supabase] Fetch failed: ' + JSON.stringify(err));
+                    return [];
+                }
+                return await res.json();
+            } catch (err) {
+                logToPage('[Supabase] fetch error: ' + err.message);
+                return [];
+            }
         }
 
         // ---------- Update presence ----------
         async function updateMyPresence() {
-            if (!currentUser) return;
+            if (!currentUser) {
+                logToPage('updateMyPresence: Not logged in.');
+                return;
+            }
             const savedKey = localStorage.getItem('torn_api_key');
             if (!savedKey) return;
 
+            clearLog();
+            logToPage('Checking online status...');
             const status = await checkOnlineStatus(savedKey);
 
             // Update UI
@@ -231,20 +277,21 @@
                 const dateStr = new Date(status.lastAction * 1000).toLocaleString();
                 lastActionInfo.innerHTML = `Last action: ${status.lastAction} (${dateStr}) · ${status.secondsAgo}s ago`;
             } else {
-                lastActionInfo.innerHTML = '⚠ No last_action data – check API key permissions in Torn!';
+                lastActionInfo.innerHTML = '⚠ No last_action data – check your API key permissions in Torn.';
             }
 
             if (status.online) {
                 const { date, slot } = getCurrentDateAndSlot();
                 await upsertPresence(currentUser.id, date, slot);
-                console.log(`✅ Marked online at slot ${slot}`);
+                logToPage(`✅ Marked online at slot ${slot}`);
             } else {
-                console.log(`⏸ Offline or no timestamp available`);
+                logToPage(`⏸ Offline or no timestamp available`);
             }
         }
 
         // ---------- Load & render grid ----------
         async function loadAndRenderGrid() {
+            logToPage('Loading grid...');
             const dates = getCurrentWeekDates();
             const data = await fetchPresence(dates);
 
@@ -256,6 +303,7 @@
             });
 
             renderGrid(dates, cellMap);
+            logToPage('Grid rendered.');
         }
 
         function renderGrid(dates, cellMap) {
@@ -280,13 +328,18 @@
             document.getElementById('gridContainer').innerHTML = html;
         }
 
-        // ---------- Login ----------
-        async function handleLogin() {
+        // ---------- 公共函数，挂载到 window 供 onclick 调用 ----------
+        window.handleLogin = async function() {
             const key = document.getElementById('apiKeyInput').value.trim();
             if (!key) return alert('Please enter your Torn API key');
 
+            clearLog();
+            logToPage('Verifying key...');
             const user = await verifyTornKey(key);
-            if (!user) return alert('Invalid API key.');
+            if (!user) {
+                alert('Invalid API key. Please check that it has at least "basic" permission.');
+                return;
+            }
 
             currentUser = user;
             localStorage.setItem('torn_api_key', key);
@@ -294,6 +347,7 @@
             document.getElementById('userNameDisplay').textContent = user.name;
             document.getElementById('userIdDisplay').textContent = user.id;
             document.getElementById('loginBtn').textContent = '🔄 Signed in';
+            logToPage(`Logged in as ${user.name}`);
 
             if (pollInterval) clearInterval(pollInterval);
             if (gridRefreshInterval) clearInterval(gridRefreshInterval);
@@ -303,38 +357,37 @@
 
             pollInterval = setInterval(updateMyPresence, 30000);
             gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
-        }
+        };
 
-        // ---------- Bind events ----------
-        function bindEvents() {
-            document.getElementById('loginBtn').addEventListener('click', handleLogin);
-            document.getElementById('manualRefreshBtn').addEventListener('click', async () => {
-                if (!currentUser) return alert('Please sign in first.');
+        window.handleManualRefresh = async function() {
+            clearLog();
+            logToPage('Manual refresh clicked...');
+            if (!currentUser) {
+                alert('Please sign in first.');
+                return;
+            }
+            try {
                 await updateMyPresence();
                 await loadAndRenderGrid();
-            });
-        }
+            } catch (err) {
+                logToPage('Refresh error: ' + err.message);
+            }
+        };
 
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindEvents);
-        else bindEvents();
+        // 仍然保留 JS 事件绑定作为备用（防止 onclick 被覆盖）
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginBtn = document.getElementById('loginBtn');
+            const manualBtn = document.getElementById('manualRefreshBtn');
+            if (loginBtn) loginBtn.addEventListener('click', window.handleLogin);
+            if (manualBtn) manualBtn.addEventListener('click', window.handleManualRefresh);
+        });
 
-        // Auto‑login
+        // Auto‑login on load
         (async () => {
             const savedKey = localStorage.getItem('torn_api_key');
             if (savedKey) {
                 document.getElementById('apiKeyInput').value = savedKey;
-                const user = await verifyTornKey(savedKey);
-                if (user) {
-                    currentUser = user;
-                    document.getElementById('userBadge').style.display = 'block';
-                    document.getElementById('userNameDisplay').textContent = user.name;
-                    document.getElementById('userIdDisplay').textContent = user.id;
-                    document.getElementById('loginBtn').textContent = '🔄 Signed in';
-                    await updateMyPresence();
-                    await loadAndRenderGrid();
-                    pollInterval = setInterval(updateMyPresence, 30000);
-                    gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
-                }
+                await window.handleLogin();  // 利用登录流程
             }
         })();
     </script>
