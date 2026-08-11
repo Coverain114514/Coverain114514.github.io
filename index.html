@@ -100,7 +100,7 @@
 
     <div class="debug-box" id="debugBox">
         <strong>🔍 API Response Inspector</strong><br>
-        (Click Refresh Grid Now to see raw Torn API response)
+        (Click Refresh Grid Now to see raw response)
     </div>
     <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
     <div id="permissionHint" class="hint"></div>
@@ -147,27 +147,28 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API v1 (stable) ----------
-        async function fetchUserData(key) {
-            // Request both basic and logs in one call
+        // ---------- Torn API v1 (stable, combined request) ----------
+        async function fetchTornData(key) {
+            // Request basic + logs together
             const url = `https://api.torn.com/user/?selections=basic,logs&key=${key}`;
             const res = await fetch(url);
             const json = await res.json();
             if (json.error) throw new Error(json.error.error || json.error);
-            return json; // v1 returns flat object with player_id, name, logs, etc.
+            return json; // v1 flat object
         }
 
         async function verifyTornKey(key) {
             try {
-                const data = await fetchUserData(key);
-                if (!data.player_id) throw new Error('No player_id in response');
+                const data = await fetchTornData(key);
+                if (!data.player_id) throw new Error('Missing player_id');
                 return { id: data.player_id, name: data.name };
             } catch (err) {
-                logToDebug('[Torn] Key verification failed: ' + err.message);
+                logToDebug('[Torn] Verification failed: ' + err.message);
+                // Show raw response for debugging
                 try {
                     const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                     const json = await res.json();
-                    logToDebug('Raw v1 basic response: ' + JSON.stringify(json).slice(0, 500));
+                    logToDebug('Raw basic response: ' + JSON.stringify(json).slice(0, 400));
                 } catch(e) {}
                 return null;
             }
@@ -175,37 +176,54 @@
 
         async function checkOnlineStatus(key) {
             try {
-                const data = await fetchUserData(key);
-                // Show snippet in debug box
-                const snippet = JSON.stringify(data, null, 2).slice(0, 600);
+                const data = await fetchTornData(key);
+                // Display snippet in debug box
+                const snippet = JSON.stringify(data, null, 2).slice(0, 700);
                 clearDebug();
-                logToDebug('✅ Torn API response (basic + logs):\n' + snippet);
+                logToDebug('✅ Torn API response (basic+logs):\n' + snippet);
 
-                const logs = data.logs;
-                if (!logs || Object.keys(logs).length === 0) {
-                    document.getElementById('permissionHint').innerHTML =
-                        '⚠️ No log entries found. Your API key may lack "logs" permission.<br>' +
-                        'Go to <a href="https://www.torn.com/preferences.php?step=api" target="_blank">Torn API Settings</a>, ' +
-                        'select your key and ensure <b>"logs"</b> is enabled, or create a new key (default includes logs).';
-                    return { online: false, lastActivity: null, secondsAgo: null };
+                // First attempt: use logs if available
+                if (data.logs && Object.keys(data.logs).length > 0) {
+                    const logsArray = Object.values(data.logs).sort((a, b) => b.timestamp - a.timestamp);
+                    const latestLog = logsArray[0];
+                    const timestamp = latestLog.timestamp;
+                    const nowSec = Math.floor(Date.now() / 1000);
+                    const secondsAgo = nowSec - timestamp;
+                    const online = secondsAgo < ONLINE_THRESHOLD_SEC;
+                    return {
+                        online,
+                        lastActivity: timestamp,
+                        secondsAgo,
+                        source: 'logs',
+                        logDescription: latestLog.log || latestLog.title || 'Unknown'
+                    };
                 }
 
-                const logsArray = Object.values(logs).sort((a, b) => b.timestamp - a.timestamp);
-                const latestLog = logsArray[0];
-                const timestamp = latestLog.timestamp;
-                const nowSec = Math.floor(Date.now() / 1000);
-                const secondsAgo = nowSec - timestamp;
-                const online = secondsAgo < ONLINE_THRESHOLD_SEC;
-                return {
-                    online,
-                    lastActivity: timestamp,
-                    secondsAgo,
-                    logDescription: latestLog.log || latestLog.title || 'Unknown'
-                };
-            } catch (err) {
-                logToDebug('[Torn] Logs fetch error: ' + err.message);
+                // Fallback: use last_action if logs missing
+                if (data.last_action && data.last_action.timestamp) {
+                    const timestamp = data.last_action.timestamp;
+                    const nowSec = Math.floor(Date.now() / 1000);
+                    const secondsAgo = nowSec - timestamp;
+                    const online = secondsAgo < ONLINE_THRESHOLD_SEC;
+                    logToDebug('⚠️ Logs missing, using last_action instead.');
+                    return {
+                        online,
+                        lastActivity: timestamp,
+                        secondsAgo,
+                        source: 'last_action'
+                    };
+                }
+
+                // Neither available
                 document.getElementById('permissionHint').innerHTML =
-                    '❌ Failed to fetch data. Make sure your API key has "basic" and "logs" permissions.';
+                    '⚠️ No log data or last_action found. Your API key may lack "logs" and "basic" permissions.<br>' +
+                    'Go to <a href="https://www.torn.com/preferences.php?step=api" target="_blank">Torn API Settings</a>, ' +
+                    'ensure <b>"basic"</b> and <b>"logs"</b> are enabled for your key.';
+                return { online: false, lastActivity: null, secondsAgo: null };
+            } catch (err) {
+                logToDebug('[Torn] Fetch error: ' + err.message);
+                document.getElementById('permissionHint').innerHTML =
+                    '❌ Unable to fetch data. Please check your API key and network.';
                 return { online: false, lastActivity: null, secondsAgo: null };
             }
         }
@@ -265,7 +283,7 @@
             if (!savedKey) return;
 
             document.getElementById('permissionHint').innerHTML = '';
-            logToDebug('Checking recent activity via logs...');
+            logToDebug('Checking recent activity...');
             const status = await checkOnlineStatus(savedKey);
 
             document.getElementById('onlineStatus').style.display = 'block';
@@ -280,9 +298,10 @@
 
             if (status.lastActivity) {
                 const dateStr = new Date(status.lastActivity * 1000).toLocaleString();
-                lastActionInfo.innerHTML = `Last log: ${status.logDescription} at ${dateStr} · ${status.secondsAgo}s ago`;
+                const source = status.source === 'logs' ? `Log: ${status.logDescription}` : 'last_action';
+                lastActionInfo.innerHTML = `${source} at ${dateStr} · ${status.secondsAgo}s ago`;
             } else {
-                lastActionInfo.textContent = 'No recent activity';
+                lastActionInfo.textContent = 'No activity data available';
             }
 
             if (status.online) {
@@ -290,7 +309,7 @@
                 await upsertPresence(currentUser.id, date, slot);
                 logToDebug(`✅ Marked online at slot ${slot}`);
             } else {
-                logToDebug(`⏸ Inactive or no logs available`);
+                logToDebug(`⏸ Inactive`);
             }
         }
 
