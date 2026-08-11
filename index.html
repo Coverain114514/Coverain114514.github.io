@@ -306,22 +306,33 @@
             renderTargets();
         }
 
-        // Data fetching (API v2, unwrapping "data" field)
+        // ---------- Debugging helper: log full response ----------
+        function logResponse(label, json) {
+            console.log(`[Torn Faction] ${label}:`, JSON.stringify(json, null, 2));
+        }
+
+        // Data fetching (with console logging)
         async function fetchFaction() {
             const res = await fetch(`https://api.torn.com/v2/faction?key=${apiKey}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = await res.json();
+            logResponse('Faction API response', json);
             if (json.error) throw new Error(json.error.error);
-            // API v2 wraps response in "data" for this endpoint
-            return json.data || json;
+            // Try multiple possible structures
+            let data = json.data || json.faction || json;
+            if (data.faction) data = data.faction; // sometimes data.faction nested
+            return data;
         }
 
         async function fetchOpponent(id) {
             const res = await fetch(`https://api.torn.com/v2/faction/${id}?key=${apiKey}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = await res.json();
+            logResponse(`Opponent faction ${id} API response`, json);
             if (json.error) throw new Error(json.error.error);
-            return json.data || json;
+            let data = json.data || json.faction || json;
+            if (data.faction) data = data.faction;
+            return data;
         }
 
         async function fetchWar() {
@@ -329,8 +340,10 @@
                 const res = await fetch(`https://api.torn.com/v2/faction/war?key=${apiKey}`);
                 if (!res.ok) return null;
                 const json = await res.json();
-                if (json.error) return null; // e.g., error code 11
-                return json.data ? json.data.war : json.war || null;
+                logResponse('War API response', json);
+                if (json.error) return null;
+                let warData = json.data || json;
+                return warData.war || warData;
             } catch {
                 return null;
             }
@@ -345,6 +358,7 @@
             }
             try {
                 factionData = await fetchFaction();
+                console.log('[Torn Faction] Extracted factionData:', factionData);
                 apiBar.classList.add('hidden');
                 sidebarFactionName.textContent = factionData.name || 'Faction';
                 renderOverview();
@@ -365,9 +379,12 @@
         function renderOverview() {
             if (!factionData) { overviewName.textContent = 'No data'; return; }
             const d = factionData;
-            factionLogo.src = `https://www.torn.com/images/factions/logo/${d.id}.png`; // v2 uses 'id'
-            factionLogo.style.display = 'block';
-            factionLogo.onerror = () => factionLogo.style.display = 'none';
+            const factionId = d.id || d.ID; // fallback
+            if (factionId) {
+                factionLogo.src = `https://www.torn.com/images/factions/logo/${factionId}.png`;
+                factionLogo.style.display = 'block';
+                factionLogo.onerror = () => factionLogo.style.display = 'none';
+            }
             overviewName.textContent = d.name || 'Unknown Faction';
             overviewTag.textContent = d.tag ? `[${d.tag}]` : '';
             const cnt = d.members ? Object.keys(d.members).length : 0;
@@ -404,7 +421,7 @@
                 warContent.innerHTML = '<div class="no-data">No active faction war ⚔️</div>';
                 return;
             }
-            const oppId = war.target;
+            const oppId = war.target || war.opponent; // some endpoints use 'opponent'
             let oppName = oppId, oppTag = '', memHtml = '';
             try {
                 const opp = await fetchOpponent(oppId);
