@@ -135,27 +135,20 @@
     </div>
     <div class="refresh-note">Updates automatically every 30 seconds</div>
 
-    <!-- Load Supabase UMD from CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script>
-        // ========== YOUR SUPABASE CREDENTIALS (HARDCODED) ==========
-        const SUPABASE_URL = 'https://ohgvzzcojnjqzvyizyxs.supabase.co'; // 你的实际 URL
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M'; // 你的 anon public key
+        // ========== 你的 Supabase 凭证（已写死） ==========
+        const SUPABASE_URL = 'https://ohgvzzcojnjqzvyizyxs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M';
 
-        // Create Supabase client
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log('[DEBUG] Supabase client initialized');
-
-        // ---------- Globals ----------
+        // ---------- 全局变量 ----------
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const SLOTS = 48; // half-hour slots
-        const ONLINE_THRESHOLD_SEC = 300; // 5 minutes
+        const SLOTS = 48;
+        const ONLINE_THRESHOLD_SEC = 300;
 
         let currentUser = null;
         let pollInterval = null;
         let gridRefreshInterval = null;
 
-        // DOM elements
         const apiKeyInput = document.getElementById('apiKeyInput');
         const loginBtn = document.getElementById('loginBtn');
         const userBadge = document.getElementById('userBadge');
@@ -163,7 +156,6 @@
         const userIdDisplay = document.getElementById('userIdDisplay');
         const gridContainer = document.getElementById('gridContainer');
 
-        // ---------- Utility ----------
         function getCurrentWeekDates() {
             const now = new Date();
             const day = now.getDay();
@@ -172,7 +164,7 @@
             return Array.from({length: 7}, (_, i) => {
                 const d = new Date(monday);
                 d.setDate(monday.getDate() + i);
-                return d.toISOString().slice(0,10); // YYYY-MM-DD
+                return d.toISOString().slice(0,10);
             });
         }
 
@@ -182,17 +174,15 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API ----------
+        // Torn API
         async function verifyTornKey(key) {
-            console.log('[DEBUG] Verifying Torn key...');
             try {
                 const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                 const data = await res.json();
-                console.log('[DEBUG] Torn API response:', data);
                 if (data.error) throw new Error(data.error.error);
                 return { id: data.player_id, name: data.name };
             } catch (err) {
-                console.error('[ERROR] Torn verification failed:', err);
+                console.error('[ERROR] Torn verification:', err);
                 return null;
             }
         }
@@ -218,7 +208,85 @@
             return { date: dateStr, slot };
         }
 
-        // ---------- Supabase presence update ----------
+        // Supabase REST helpers
+        function supabaseHeaders() {
+            return {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function upsertPresence(userId, date, slot, timestamp) {
+            const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
+            let res = await fetch(checkUrl, { headers: supabaseHeaders() });
+            if (!res.ok) {
+                const err = await res.json();
+                console.error('[ERROR] Check presence failed:', err);
+                alert('Supabase query failed: ' + (err.message || JSON.stringify(err)));
+                return;
+            }
+            const existing = await res.json();
+
+            if (existing && existing.length > 0) {
+                const id = existing[0].id;
+                const updateUrl = `${SUPABASE_URL}/rest/v1/presence?id=eq.${id}`;
+                res = await fetch(updateUrl, {
+                    method: 'PATCH',
+                    headers: supabaseHeaders(),
+                    body: JSON.stringify({ timestamp: timestamp })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    console.error('[ERROR] Update failed:', err);
+                    alert('Supabase update failed: ' + (err.message || JSON.stringify(err)));
+                }
+            } else {
+                const insertUrl = `${SUPABASE_URL}/rest/v1/presence`;
+                res = await fetch(insertUrl, {
+                    method: 'POST',
+                    headers: supabaseHeaders(),
+                    body: JSON.stringify({
+                        user_id: userId,
+                        date: date,
+                        slot: slot,
+                        timestamp: timestamp
+                    })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    console.error('[ERROR] Insert failed:', err);
+                    alert('Supabase insert failed: ' + (err.message || JSON.stringify(err)));
+                }
+            }
+        }
+
+        async function deletePresence(userId, date, slot) {
+            const url = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}`;
+            const res = await fetch(url, {
+                method: 'DELETE',
+                headers: supabaseHeaders()
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                console.error('[ERROR] Delete failed:', err);
+                alert('Supabase delete failed: ' + (err.message || JSON.stringify(err)));
+            }
+        }
+
+        async function fetchPresence(dates, cutoffTimestamp) {
+            const dateList = dates.map(d => `"${d}"`).join(',');
+            const url = `${SUPABASE_URL}/rest/v1/presence?date=in.(${encodeURIComponent(dateList)})&timestamp=gt.${cutoffTimestamp}&select=*`;
+            const res = await fetch(url, { headers: supabaseHeaders() });
+            if (!res.ok) {
+                const err = await res.json();
+                console.error('[ERROR] Fetch presence failed:', err);
+                alert('Supabase read failed: ' + (err.message || JSON.stringify(err)));
+                return [];
+            }
+            return await res.json();
+        }
+
         async function updateMyPresence() {
             if (!currentUser) return;
             const savedKey = localStorage.getItem('torn_api_key');
@@ -229,43 +297,17 @@
             const now = Date.now();
 
             if (online) {
-                console.log('[DEBUG] Updating presence: online at', date, slot);
-                const { error } = await supabaseClient
-                    .from('presence')
-                    .upsert({
-                        user_id: currentUser.id,
-                        date: date,
-                        slot: slot,
-                        timestamp: now
-                    }, { onConflict: 'user_id, date, slot' });
-                if (error) console.error('[ERROR] Supabase upsert:', error);
+                await upsertPresence(currentUser.id, date, slot, now);
             } else {
-                console.log('[DEBUG] Removing presence: offline at', date, slot);
-                const { error } = await supabaseClient
-                    .from('presence')
-                    .delete()
-                    .eq('user_id', currentUser.id)
-                    .eq('date', date)
-                    .eq('slot', slot);
-                if (error) console.error('[ERROR] Supabase delete:', error);
+                await deletePresence(currentUser.id, date, slot);
             }
         }
 
-        // ---------- Load grid data ----------
         async function loadAndRenderGrid() {
             const dates = getCurrentWeekDates();
             const cutoff = Date.now() - ONLINE_THRESHOLD_SEC * 1000;
 
-            const { data, error } = await supabaseClient
-                .from('presence')
-                .select('*')
-                .in('date', dates)
-                .gt('timestamp', cutoff);
-
-            if (error) {
-                console.error('[ERROR] Loading presence:', error);
-                return;
-            }
+            const data = await fetchPresence(dates, cutoff);
 
             const cellMap = {};
             data.forEach(row => {
@@ -300,7 +342,6 @@
             gridContainer.innerHTML = html;
         }
 
-        // ---------- Login flow ----------
         async function handleLogin() {
             const key = apiKeyInput.value.trim();
             if (!key) {
@@ -311,7 +352,7 @@
             console.log('[DEBUG] Login button clicked');
             const user = await verifyTornKey(key);
             if (!user) {
-                alert('Invalid API key. Please try again.');
+                alert('Invalid Torn API key. Please try again.');
                 return;
             }
 
@@ -321,22 +362,18 @@
             userNameDisplay.textContent = user.name;
             userIdDisplay.textContent = user.id;
             loginBtn.textContent = '🔄 Signed in';
-            console.log('[DEBUG] User logged in:', user);
 
-            // Clear old intervals
             if (pollInterval) clearInterval(pollInterval);
             if (gridRefreshInterval) clearInterval(gridRefreshInterval);
 
-            // Initial update
             await updateMyPresence();
             pollInterval = setInterval(updateMyPresence, 30000);
 
-            // Initial grid load
             await loadAndRenderGrid();
             gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
         }
 
-        // Ensure login button works after DOM ready
+        // 确保按钮绑定
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 loginBtn.addEventListener('click', handleLogin);
@@ -344,10 +381,10 @@
             });
         } else {
             loginBtn.addEventListener('click', handleLogin);
-            console.log('[DEBUG] Login event bound (DOM already ready)');
+            console.log('[DEBUG] Login event bound');
         }
 
-        // Auto-login if key saved
+        // 自动登录
         (async () => {
             const savedKey = localStorage.getItem('torn_api_key');
             if (savedKey) {
