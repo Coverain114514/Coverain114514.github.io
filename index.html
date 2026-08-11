@@ -79,7 +79,6 @@
 
     <div class="login-panel">
         <input type="text" id="apiKeyInput" placeholder="Paste your Torn API key">
-        <!-- 使用 onclick 绑定，确保点击一定触发 -->
         <button id="loginBtn" onclick="window.handleLogin()">🔑 Sign In</button>
     </div>
 
@@ -116,14 +115,12 @@
         let pollInterval = null;
         let gridRefreshInterval = null;
 
-        // 简单调试输出到页面底部
         function logToPage(msg) {
             const el = document.getElementById('errorLog');
             if (el) el.textContent += msg + '\n';
             console.log(msg);
         }
 
-        // 清理旧日志
         function clearLog() {
             const el = document.getElementById('errorLog');
             if (el) el.textContent = '';
@@ -148,12 +145,14 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API ----------
+        // ---------- Torn API v2 (no selections parameter) ----------
         async function verifyTornKey(key) {
             try {
-                const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
-                const data = await res.json();
-                if (data.error) throw new Error(data.error.error);
+                const res = await fetch(`https://api.torn.com/v2/user?key=${key}`);
+                const json = await res.json();
+                if (json.error) throw new Error(json.error.error || json.error);
+                // v2 wraps response in "data" sometimes, but /user returns flat
+                const data = json.data || json;
                 return { id: data.player_id, name: data.name };
             } catch (err) {
                 logToPage('[Torn] Key verification failed: ' + err.message);
@@ -163,16 +162,17 @@
 
         async function checkOnlineStatus(key) {
             try {
-                const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
-                const data = await res.json();
-                if (data.error) return { online: false, lastAction: null, secondsAgo: null, rawData: data };
-
+                const res = await fetch(`https://api.torn.com/v2/user?key=${key}`);
+                const json = await res.json();
+                if (json.error) {
+                    return { online: false, lastAction: null, secondsAgo: null };
+                }
+                const data = json.data || json;
                 const lastAction = data.last_action;
                 if (!lastAction || !lastAction.timestamp) {
-                    logToPage('[Torn] No last_action in response. Check API key permissions.');
+                    logToPage('[Torn] No last_action in response.');
                     return { online: false, lastAction: null, secondsAgo: null, rawData: data };
                 }
-
                 const timestamp = lastAction.timestamp;
                 const nowSec = Math.floor(Date.now() / 1000);
                 const secondsAgo = nowSec - timestamp;
@@ -180,7 +180,7 @@
                 return { online, lastAction: timestamp, secondsAgo, rawData: data };
             } catch (err) {
                 logToPage('[Torn] Online check error: ' + err.message);
-                return { online: false, lastAction: null, secondsAgo: null, rawData: null };
+                return { online: false, lastAction: null, secondsAgo: null };
             }
         }
 
@@ -211,7 +211,6 @@
                     return;
                 }
                 const existing = await res.json();
-
                 if (existing.length === 0) {
                     const insertUrl = `${SUPABASE_URL}/rest/v1/presence`;
                     res = await fetch(insertUrl, {
@@ -262,7 +261,6 @@
             logToPage('Checking online status...');
             const status = await checkOnlineStatus(savedKey);
 
-            // Update UI
             document.getElementById('onlineStatus').style.display = 'block';
             const statusText = document.getElementById('statusText');
             const lastActionInfo = document.getElementById('lastActionInfo');
@@ -277,7 +275,7 @@
                 const dateStr = new Date(status.lastAction * 1000).toLocaleString();
                 lastActionInfo.innerHTML = `Last action: ${status.lastAction} (${dateStr}) · ${status.secondsAgo}s ago`;
             } else {
-                lastActionInfo.innerHTML = '⚠ No last_action data – check your API key permissions in Torn.';
+                lastActionInfo.innerHTML = '⚠ No last_action data – check your API key permissions.';
             }
 
             if (status.online) {
@@ -328,7 +326,7 @@
             document.getElementById('gridContainer').innerHTML = html;
         }
 
-        // ---------- 公共函数，挂载到 window 供 onclick 调用 ----------
+        // ---------- Public methods bound to onclick ----------
         window.handleLogin = async function() {
             const key = document.getElementById('apiKeyInput').value.trim();
             if (!key) return alert('Please enter your Torn API key');
@@ -337,7 +335,7 @@
             logToPage('Verifying key...');
             const user = await verifyTornKey(key);
             if (!user) {
-                alert('Invalid API key. Please check that it has at least "basic" permission.');
+                alert('Invalid API key. Check permissions or key correctness.');
                 return;
             }
 
@@ -374,20 +372,12 @@
             }
         };
 
-        // 仍然保留 JS 事件绑定作为备用（防止 onclick 被覆盖）
-        document.addEventListener('DOMContentLoaded', () => {
-            const loginBtn = document.getElementById('loginBtn');
-            const manualBtn = document.getElementById('manualRefreshBtn');
-            if (loginBtn) loginBtn.addEventListener('click', window.handleLogin);
-            if (manualBtn) manualBtn.addEventListener('click', window.handleManualRefresh);
-        });
-
-        // Auto‑login on load
+        // ---------- Auto-login ----------
         (async () => {
             const savedKey = localStorage.getItem('torn_api_key');
             if (savedKey) {
                 document.getElementById('apiKeyInput').value = savedKey;
-                await window.handleLogin();  // 利用登录流程
+                await window.handleLogin();
             }
         })();
     </script>
