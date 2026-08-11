@@ -3,482 +3,351 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Torn Faction Homepage</title>
+    <title>Torn Live Online Grid</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #1a1a1a;
-            color: #ddd;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
+            background: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 20px;
         }
-
-        .sidebar {
-            width: 220px;
-            background: #1e1e1e;
-            padding: 30px 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            border-right: 1px solid #333;
-            flex-shrink: 0;
+        h1 {
+            text-align: center;
+            color: #58a6ff;
+            margin-bottom: 12px;
         }
-        .sidebar h3 {
-            color: #f1c40f;
-            margin-bottom: 25px;
-            font-size: 1.2rem;
-        }
-        .nav-btn {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 10px;
-            background: #2a2a2a;
-            border: 1px solid #444;
-            color: #ccc;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1rem;
-            text-align: left;
-            transition: all 0.2s;
-        }
-        .nav-btn:hover {
-            background: #c0392b;
-            color: white;
-            border-color: #c0392b;
-        }
-        .nav-btn.active {
-            background: #c0392b;
-            color: white;
-            font-weight: bold;
-            border-color: #c0392b;
-        }
-        .change-key {
-            margin-top: auto;
-            font-size: 0.8rem;
-            color: #777;
-            cursor: pointer;
-            text-decoration: underline;
-            background: none;
-            border: none;
-            padding: 5px;
-        }
-
-        .main-content {
-            flex: 1;
-            padding: 30px;
-            overflow-y: auto;
-        }
-
-        .api-bar {
-            background: #252525;
-            padding: 15px;
+        .login-panel {
+            background: #161b22;
+            border: 1px solid #30363d;
             border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 16px;
+            max-width: 520px;
+            margin: 0 auto 20px;
             display: flex;
             gap: 10px;
             align-items: center;
-            border: 1px solid #333;
+            justify-content: center;
+            flex-wrap: wrap;
         }
-        .api-bar.hidden { display: none; }
-        .api-bar input {
+        .login-panel input {
             flex: 1;
             padding: 8px 12px;
-            background: #1a1a1a;
-            border: 1px solid #555;
-            color: #eee;
-            border-radius: 4px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #f0f6fc;
+            min-width: 200px;
         }
-        .api-bar button {
-            padding: 8px 20px;
-            background: #c0392b;
-            border: none;
+        .login-panel button {
+            padding: 8px 18px;
+            background: #238636;
+            border: 1px solid #2ea043;
+            border-radius: 6px;
             color: white;
-            border-radius: 4px;
             cursor: pointer;
+            font-weight: 600;
+        }
+        .login-panel button:hover { background: #2ea043; }
+        .user-badge {
+            text-align: center;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            color: #8b949e;
+        }
+        .user-badge strong { color: #f0c040; }
+
+        .grid-container {
+            overflow-x: auto;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #21262d;
+            padding: 4px 2px;
+            text-align: center;
+            font-size: 0.7rem;
+            height: 28px;
+            vertical-align: middle;
+        }
+        th {
+            background: #21262d;
+            color: #58a6ff;
+            position: sticky;
+            top: 0;
+            z-index: 3;
+        }
+        .day-col {
+            background: #21262d;
+            color: #f0c040;
+            font-weight: bold;
+            width: 70px;
+        }
+        .time-header { font-size: 0.65rem; white-space: nowrap; }
+        td.online {
+            background: rgba(88, 166, 255, 0.15);
+            color: #58a6ff;
             font-weight: bold;
         }
-
-        .view { display: none; animation: fadeIn 0.2s; }
-        .view.active { display: block; }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        td.online::after {
+            content: attr(data-count);
+            font-size: 0.65rem;
+            margin-left: 2px;
         }
-
-        .overview-header {
+        .legend {
             display: flex;
-            align-items: center;
-            gap: 25px;
-            margin-bottom: 30px;
+            justify-content: center;
+            gap: 18px;
+            margin: 10px 0 15px;
+            font-size: 0.8rem;
         }
-        .faction-logo {
-            width: 120px;
-            height: 120px;
-            object-fit: contain;
-            border-radius: 12px;
-            background: #2a2a2a;
-            border: 2px solid #444;
+        .legend span::before {
+            content: '■';
+            margin-right: 5px;
+            color: rgba(88, 166, 255, 0.15);
         }
-        .overview-info h2 { font-size: 2rem; color: #fff; }
-        .overview-info .tag { color: #aaa; font-size: 1.1rem; margin: 5px 0; }
-        .overview-info .stats { color: #888; font-size: 0.95rem; }
-
-        .card {
-            background: #252525;
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid #333;
+        .refresh-note {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #484f58;
+            margin-top: 10px;
         }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        th, td { padding: 8px; border-bottom: 1px solid #333; text-align: left; }
-        .online { color: #2ecc71; font-weight: bold; }
-        .offline { color: #7f8c8d; }
-        .no-data { color: #888; font-style: italic; text-align: center; padding: 20px; }
-
-        .add-target { display: flex; gap: 5px; margin-bottom: 15px; }
-        .add-target input {
-            flex: 1; padding: 6px; background: #333; border: 1px solid #555; color: #ddd; border-radius: 4px;
-        }
-        .add-target button, .delete-btn {
-            background: #2980b9; border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer;
-        }
-        .delete-btn { background: #c0392b; padding: 3px 8px; font-size: 0.8rem; }
-        .announcement-box {
-            background: #1e1e1e; padding: 20px; border-radius: 8px; white-space: pre-wrap; font-style: italic;
-        }
-        .war-opponent-members { margin-top: 20px; }
-        .refresh-info { margin-top: 25px; font-size: 0.8rem; color: #666; text-align: center; }
     </style>
 </head>
 <body>
+    <h1>🕒 Torn Live Online Grid</h1>
 
-    <div class="sidebar">
-        <h3 id="sidebarFactionName">Faction</h3>
-        <button class="nav-btn active" data-view="overview">🏠 Overview</button>
-        <button class="nav-btn" data-view="targets">🎯 Target List</button>
-        <button class="nav-btn" data-view="members">👥 Members</button>
-        <button class="nav-btn" data-view="war">⚔️ War</button>
-        <button class="nav-btn" data-view="announcement">📢 Announcement</button>
-        <button class="change-key" id="changeKeyBtn">Change API Key</button>
+    <div class="login-panel">
+        <input type="text" id="apiKeyInput" placeholder="Paste your Torn API key">
+        <button id="loginBtn">🔑 Sign In</button>
     </div>
 
-    <div class="main-content">
-        <div class="api-bar" id="apiBar">
-            <input type="text" id="apiKeyInput" placeholder="Enter your Torn API Key">
-            <button id="saveKeyBtn">💾 Save Key</button>
-            <button id="refreshBtn">🔄 Refresh</button>
-        </div>
-
-        <div id="viewOverview" class="view active">
-            <div class="overview-header">
-                <img id="factionLogo" class="faction-logo" src="" alt="Faction Logo" style="display:none;">
-                <div class="overview-info">
-                    <h2 id="overviewName">Loading...</h2>
-                    <div class="tag" id="overviewTag"></div>
-                    <div class="stats">
-                        <span id="overviewMembers">Members: --</span> |
-                        <span id="overviewLeader">Leader: --</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="viewTargets" class="view">
-            <div class="card">
-                <div class="add-target">
-                    <input type="text" id="newTargetInput" placeholder="Enter target name or ID">
-                    <button id="addTargetBtn">Add</button>
-                </div>
-                <table>
-                    <thead><tr><th>Target</th><th>Action</th></tr></thead>
-                    <tbody id="targetListBody"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="viewMembers" class="view">
-            <div class="card">
-                <table>
-                    <thead><tr><th>Name</th><th>Level</th><th>Position</th><th>Status</th></tr></thead>
-                    <tbody id="memberListBody"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="viewWar" class="view">
-            <div class="card" id="warContent">Loading...</div>
-        </div>
-
-        <div id="viewAnnouncement" class="view">
-            <div class="card">
-                <div id="announcementContent" class="announcement-box">Loading...</div>
-            </div>
-        </div>
-
-        <div class="refresh-info">Auto-refreshes every 30 seconds | <span id="lastUpdate"></span></div>
+    <div id="userBadge" class="user-badge" style="display:none;">
+        Signed in as <strong id="userNameDisplay"></strong> (ID: <strong id="userIdDisplay"></strong>)
     </div>
 
-    <script>
-        const DEFAULT_API_KEY = 'YOUR_API_KEY';
-        let apiKey = localStorage.getItem('torn_api_key') || DEFAULT_API_KEY;
-        let factionData = null;
-        let currentView = 'overview';
+    <div class="legend"><span>Online (last 5 min)</span></div>
+
+    <div class="grid-container" id="gridContainer">
+        <p style="text-align:center;padding:30px;color:#8b949e;">Sign in with your Torn API key to view the live grid.</p>
+    </div>
+    <div class="refresh-note">Updates automatically every 30 seconds</div>
+
+    <!-- Supabase SDK -->
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+        // ========== REPLACE WITH YOUR SUPABASE CREDENTIALS ==========
+        const SUPABASE_URL = 'https://ohgvzzcojnjqzvyizyxs.supabase.co/rest/v1/';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M';
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ---------- Globals ----------
+        const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const SLOTS = 48;
+        const ONLINE_THRESHOLD_SEC = 300; // 5 min
+
+        let currentUser = null;
+        let pollInterval = null;
+        let gridRefreshInterval = null;
 
         // DOM elements
-        const apiBar = document.getElementById('apiBar');
         const apiKeyInput = document.getElementById('apiKeyInput');
-        const saveKeyBtn = document.getElementById('saveKeyBtn');
-        const refreshBtn = document.getElementById('refreshBtn');
-        const changeKeyBtn = document.getElementById('changeKeyBtn');
-        const sidebarFactionName = document.getElementById('sidebarFactionName');
-        const navBtns = document.querySelectorAll('.nav-btn');
+        const loginBtn = document.getElementById('loginBtn');
+        const userBadge = document.getElementById('userBadge');
+        const userNameDisplay = document.getElementById('userNameDisplay');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const gridContainer = document.getElementById('gridContainer');
 
-        const factionLogo = document.getElementById('factionLogo');
-        const overviewName = document.getElementById('overviewName');
-        const overviewTag = document.getElementById('overviewTag');
-        const overviewMembers = document.getElementById('overviewMembers');
-        const overviewLeader = document.getElementById('overviewLeader');
-
-        const views = {
-            overview: document.getElementById('viewOverview'),
-            targets: document.getElementById('viewTargets'),
-            members: document.getElementById('viewMembers'),
-            war: document.getElementById('viewWar'),
-            announcement: document.getElementById('viewAnnouncement')
-        };
-
-        const newTargetInput = document.getElementById('newTargetInput');
-        const addTargetBtn = document.getElementById('addTargetBtn');
-        const targetListBody = document.getElementById('targetListBody');
-        const memberListBody = document.getElementById('memberListBody');
-        const warContent = document.getElementById('warContent');
-        const announcementContent = document.getElementById('announcementContent');
-        const lastUpdateSpan = document.getElementById('lastUpdate');
-
-        // Helpers
-        function formatTime(t) { return t ? new Date(t * 1000).toLocaleString('en-US') : 'Unknown'; }
-        function isOnline(ts) { return ts ? (Math.floor(Date.now()/1000) - ts) < 300 : false; }
-        function escapeHtml(s) {
-            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-        }
-
-        // View switching
-        function switchView(v) {
-            currentView = v;
-            navBtns.forEach(b => b.classList.toggle('active', b.dataset.view === v));
-            Object.keys(views).forEach(k => views[k].classList.toggle('active', k === v));
-            renderCurrentView();
-        }
-
-        function renderCurrentView() {
-            switch (currentView) {
-                case 'overview': renderOverview(); break;
-                case 'targets': renderTargets(); break;
-                case 'members': renderMembersView(); break;
-                case 'war': renderWarView(); break;
-                case 'announcement': renderAnnouncementView(); break;
-            }
-        }
-
-        // Target list (local)
-        function getTargets() { return JSON.parse(localStorage.getItem('torn_targets') || '[]'); }
-        function saveTargets(a) { localStorage.setItem('torn_targets', JSON.stringify(a)); }
-        function renderTargets() {
-            const t = getTargets();
-            targetListBody.innerHTML = t.length ? t.map((x,i) => `<tr><td>${escapeHtml(x)}</td><td><button class="delete-btn" data-index="${i}">Delete</button></td></tr>`).join('') : '<tr><td colspan="2" class="no-data">No targets yet</td></tr>';
-            document.querySelectorAll('.delete-btn').forEach(b => b.onclick = () => {
-                const i = parseInt(b.dataset.index);
-                const list = getTargets();
-                list.splice(i,1);
-                saveTargets(list);
-                renderTargets();
+        // ---------- Utility ----------
+        function getCurrentWeekDates() {
+            const now = new Date();
+            const day = now.getDay();
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+            return Array.from({length: 7}, (_, i) => {
+                const d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                return d.toISOString().slice(0,10); // YYYY-MM-DD
             });
         }
-        function addTarget() {
-            const v = newTargetInput.value.trim();
-            if (!v) return;
-            const list = getTargets();
-            list.push(v);
-            saveTargets(list);
-            newTargetInput.value = '';
-            renderTargets();
+
+        function getSlotTime(slot) {
+            const h = String(Math.floor(slot / 2)).padStart(2, '0');
+            const m = slot % 2 === 0 ? '00' : '30';
+            return `${h}:${m}`;
         }
 
-        // ---------- Debugging helper: log full response ----------
-        function logResponse(label, json) {
-            console.log(`[Torn Faction] ${label}:`, JSON.stringify(json, null, 2));
-        }
-
-        // Data fetching (with console logging)
-        async function fetchFaction() {
-            const res = await fetch(`https://api.torn.com/v2/faction?key=${apiKey}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const json = await res.json();
-            logResponse('Faction API response', json);
-            if (json.error) throw new Error(json.error.error);
-            // Try multiple possible structures
-            let data = json.data || json.faction || json;
-            if (data.faction) data = data.faction; // sometimes data.faction nested
-            return data;
-        }
-
-        async function fetchOpponent(id) {
-            const res = await fetch(`https://api.torn.com/v2/faction/${id}?key=${apiKey}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const json = await res.json();
-            logResponse(`Opponent faction ${id} API response`, json);
-            if (json.error) throw new Error(json.error.error);
-            let data = json.data || json.faction || json;
-            if (data.faction) data = data.faction;
-            return data;
-        }
-
-        async function fetchWar() {
+        // ---------- Torn API ----------
+        async function verifyTornKey(key) {
             try {
-                const res = await fetch(`https://api.torn.com/v2/faction/war?key=${apiKey}`);
-                if (!res.ok) return null;
-                const json = await res.json();
-                logResponse('War API response', json);
-                if (json.error) return null;
-                let warData = json.data || json;
-                return warData.war || warData;
-            } catch {
-                return null;
-            }
+                const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error.error);
+                return { id: data.player_id, name: data.name };
+            } catch { return null; }
         }
 
-        // Main load
-        async function loadAll(showBar = true) {
-            if (!apiKey || apiKey === 'YOUR_API_KEY') {
-                alert('Please enter a valid Torn API Key first!');
-                apiBar.classList.remove('hidden');
-                return false;
-            }
+        async function isUserOnline(key) {
             try {
-                factionData = await fetchFaction();
-                console.log('[Torn Faction] Extracted factionData:', factionData);
-                apiBar.classList.add('hidden');
-                sidebarFactionName.textContent = factionData.name || 'Faction';
-                renderOverview();
-                renderCurrentView();
-                lastUpdateSpan.textContent = 'Last updated: ' + new Date().toLocaleTimeString('en-US');
-                return true;
-            } catch (err) {
-                console.error(err);
-                if (showBar) {
-                    apiBar.classList.remove('hidden');
-                    alert('Failed to load faction data: ' + err.message);
-                }
-                return false;
-            }
+                const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
+                const data = await res.json();
+                if (data.error) return false;
+                const last = data.last_action?.timestamp;
+                if (!last) return false;
+                const now = Math.floor(Date.now() / 1000);
+                return (now - last) < ONLINE_THRESHOLD_SEC;
+            } catch { return false; }
         }
 
-        // Render functions
-        function renderOverview() {
-            if (!factionData) { overviewName.textContent = 'No data'; return; }
-            const d = factionData;
-            const factionId = d.id || d.ID; // fallback
-            if (factionId) {
-                factionLogo.src = `https://www.torn.com/images/factions/logo/${factionId}.png`;
-                factionLogo.style.display = 'block';
-                factionLogo.onerror = () => factionLogo.style.display = 'none';
-            }
-            overviewName.textContent = d.name || 'Unknown Faction';
-            overviewTag.textContent = d.tag ? `[${d.tag}]` : '';
-            const cnt = d.members ? Object.keys(d.members).length : 0;
-            overviewMembers.textContent = `Members: ${cnt}`;
-            overviewLeader.textContent = `Leader: ${d.leader || 'Unknown'}`;
+        function getCurrentDateAndSlot() {
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0,10);
+            const hours = now.getUTCHours();
+            const minutes = now.getUTCMinutes();
+            const slot = hours * 2 + (minutes >= 30 ? 1 : 0);
+            return { date: dateStr, slot };
         }
 
-        function renderMembersView() {
-            if (!factionData || !factionData.members) {
-                memberListBody.innerHTML = '<tr><td colspan="4" class="no-data">No member data</td></tr>';
-                return;
-            }
-            const mems = Object.entries(factionData.members).map(([id,m]) => ({id,...m}));
-            mems.sort((a,b) => {
-                const ao = isOnline(a.last_action?.timestamp), bo = isOnline(b.last_action?.timestamp);
-                if (ao && !bo) return -1; if (!ao && bo) return 1;
-                return (b.level||0) - (a.level||0);
-            });
-            memberListBody.innerHTML = mems.map(m => {
-                const online = isOnline(m.last_action?.timestamp);
-                return `<tr>
-                    <td>${escapeHtml(m.name)}</td><td>${m.level}</td>
-                    <td>${escapeHtml(m.position||'Member')}</td>
-                    <td class="${online?'online':'offline'}">${online?'● Online':'○ Offline'}</td>
-                </tr>`;
-            }).join('');
-        }
+        // ---------- Supabase presence update ----------
+        async function updateMyPresence() {
+            if (!currentUser) return;
+            const savedKey = localStorage.getItem('torn_api_key');
+            if (!savedKey) return;
 
-        async function renderWarView() {
-            warContent.innerHTML = '<div class="no-data">Checking war status...</div>';
-            let war;
-            try { war = await fetchWar(); } catch { war = null; }
-            if (!war) {
-                warContent.innerHTML = '<div class="no-data">No active faction war ⚔️</div>';
-                return;
-            }
-            const oppId = war.target || war.opponent; // some endpoints use 'opponent'
-            let oppName = oppId, oppTag = '', memHtml = '';
-            try {
-                const opp = await fetchOpponent(oppId);
-                oppName = opp.name || oppId;
-                oppTag = opp.tag ? `[${opp.tag}]` : '';
-                if (opp.members) {
-                    const mems = Object.values(opp.members);
-                    memHtml = mems.map(m => {
-                        const online = isOnline(m.last_action?.timestamp);
-                        return `<tr><td>${escapeHtml(m.name)}</td><td>${m.level}</td><td class="${online?'online':'offline'}">${online?'Online':'Offline'}</td></tr>`;
-                    }).join('');
-                } else {
-                    memHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent members</td></tr>';
-                }
-            } catch {
-                memHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent info</td></tr>';
-            }
-            warContent.innerHTML = `
-                <div style="margin-bottom:20px;">
-                    <strong>Opponent:</strong> ${escapeHtml(oppName)} ${escapeHtml(oppTag)}<br>
-                    <strong>Score:</strong> Us ${war.score||0} - ${war.target_score||0} Them<br>
-                    <strong>Ends:</strong> ${formatTime(war.end)}
-                </div>
-                <div class="war-opponent-members">
-                    <h3>Opponent Members & Status</h3>
-                    <table><thead><tr><th>Name</th><th>Level</th><th>Status</th></tr></thead><tbody>${memHtml}</tbody></table>
-                </div>
-            `;
-        }
+            const online = await isUserOnline(savedKey);
+            const { date, slot } = getCurrentDateAndSlot();
+            const now = Date.now();
 
-        function renderAnnouncementView() {
-            if (factionData?.announcement?.text) {
-                announcementContent.textContent = factionData.announcement.text;
+            if (online) {
+                // Upsert: insert or update timestamp
+                const { error } = await supabase
+                    .from('presence')
+                    .upsert({
+                        user_id: currentUser.id,
+                        date: date,
+                        slot: slot,
+                        timestamp: now
+                    }, { onConflict: 'user_id, date, slot' });
+                if (error) console.error('Supabase upsert error:', error);
             } else {
-                announcementContent.textContent = 'No announcement';
+                // Delete any existing entry for this slot (offline -> remove)
+                const { error } = await supabase
+                    .from('presence')
+                    .delete()
+                    .eq('user_id', currentUser.id)
+                    .eq('date', date)
+                    .eq('slot', slot);
+                if (error) console.error('Supabase delete error:', error);
             }
         }
 
-        // Event listeners
-        navBtns.forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
-        saveKeyBtn.addEventListener('click', () => {
-            const k = apiKeyInput.value.trim();
-            if (!k) return alert('Key cannot be empty');
-            apiKey = k;
-            localStorage.setItem('torn_api_key', apiKey);
-            loadAll();
-        });
-        refreshBtn.addEventListener('click', () => loadAll());
-        changeKeyBtn.addEventListener('click', () => { apiBar.classList.remove('hidden'); apiKeyInput.focus(); });
-        addTargetBtn.addEventListener('click', addTarget);
-        newTargetInput.addEventListener('keypress', e => { if (e.key==='Enter') addTarget(); });
+        // ---------- Load grid data ----------
+        async function loadAndRenderGrid() {
+            const dates = getCurrentWeekDates();
+            const cutoff = Date.now() - ONLINE_THRESHOLD_SEC * 1000;
 
-        // Init
-        apiKeyInput.value = apiKey;
-        renderTargets();
-        loadAll(false).then(success => { if (!success) apiBar.classList.remove('hidden'); });
-        setInterval(() => loadAll(false), 30000);
+            // Fetch all presence records for this week that are fresh
+            const { data, error } = await supabase
+                .from('presence')
+                .select('*')
+                .in('date', dates)
+                .gt('timestamp', cutoff);
+
+            if (error) {
+                console.error('Error loading presence:', error);
+                return;
+            }
+
+            // Build cell map: { "date_slot": [user_id, ...] }
+            const cellMap = {};
+            data.forEach(row => {
+                const cellKey = `${row.date}_${row.slot}`;
+                if (!cellMap[cellKey]) cellMap[cellKey] = [];
+                cellMap[cellKey].push(row.user_id);
+            });
+
+            renderGrid(dates, cellMap);
+        }
+
+        function renderGrid(dates, cellMap) {
+            let html = '<table><thead><tr><th>Time</th>';
+            dates.forEach((date, i) => {
+                html += `<th>${DAYS[i]}<br>${date.slice(5)}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            for (let s = 0; s < SLOTS; s++) {
+                html += '<tr>';
+                html += `<td class="time-header">${getSlotTime(s)}</td>`;
+                dates.forEach(date => {
+                    const cellKey = `${date}_${s}`;
+                    const users = cellMap[cellKey] || [];
+                    const count = users.length;
+                    const cls = count > 0 ? 'online' : '';
+                    html += `<td class="${cls}" data-count="${count > 1 ? count : ''}"></td>`;
+                });
+                html += '</tr>';
+            }
+            html += '</tbody></table>';
+            gridContainer.innerHTML = html;
+        }
+
+        // ---------- Login ----------
+        loginBtn.addEventListener('click', async () => {
+            const key = apiKeyInput.value.trim();
+            if (!key) return alert('Please enter your Torn API key');
+
+            const user = await verifyTornKey(key);
+            if (!user) {
+                alert('Invalid API key. Please try again.');
+                return;
+            }
+
+            currentUser = user;
+            localStorage.setItem('torn_api_key', key);
+            userBadge.style.display = 'block';
+            userNameDisplay.textContent = user.name;
+            userIdDisplay.textContent = user.id;
+            loginBtn.textContent = '🔄 Signed in';
+
+            if (pollInterval) clearInterval(pollInterval);
+            await updateMyPresence();
+            pollInterval = setInterval(updateMyPresence, 30000);
+
+            if (gridRefreshInterval) clearInterval(gridRefreshInterval);
+            await loadAndRenderGrid();
+            gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
+        });
+
+        // Auto-login
+        (async () => {
+            const savedKey = localStorage.getItem('torn_api_key');
+            if (savedKey) {
+                apiKeyInput.value = savedKey;
+                const user = await verifyTornKey(savedKey);
+                if (user) {
+                    currentUser = user;
+                    userBadge.style.display = 'block';
+                    userNameDisplay.textContent = user.name;
+                    userIdDisplay.textContent = user.id;
+                    loginBtn.textContent = '🔄 Signed in';
+                    await updateMyPresence();
+                    pollInterval = setInterval(updateMyPresence, 30000);
+                    await loadAndRenderGrid();
+                    gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
+                }
+            }
+        })();
     </script>
 </body>
 </html>
