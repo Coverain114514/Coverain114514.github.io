@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torn Faction Homepage</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a1a;
+            color: #ddd;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ----- Sidebar ----- */
+        .sidebar {
+            width: 220px;
+            background: #1e1e1e;
+            padding: 30px 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-right: 1px solid #333;
+            flex-shrink: 0;
+        }
+        .sidebar h3 {
+            color: #f1c40f;
+            margin-bottom: 25px;
+            font-size: 1.2rem;
+        }
+        .nav-btn {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        .nav-btn:hover {
+            background: #c0392b;
+            color: white;
+            border-color: #c0392b;
+        }
+        .nav-btn.active {
+            background: #c0392b;
+            color: white;
+            font-weight: bold;
+            border-color: #c0392b;
+        }
+        .change-key {
+            margin-top: auto;
+            font-size: 0.8rem;
+            color: #777;
+            cursor: pointer;
+            text-decoration: underline;
+            background: none;
+            border: none;
+            padding: 5px;
+        }
+
+        /* ----- Main Content ----- */
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        /* API Key bar (hidden after success) */
+        .api-bar {
+            background: #252525;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            border: 1px solid #333;
+        }
+        .api-bar.hidden {
+            display: none;
+        }
+        .api-bar input {
+            flex: 1;
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border: 1px solid #555;
+            color: #eee;
+            border-radius: 4px;
+        }
+        .api-bar button {
+            padding: 8px 20px;
+            background: #c0392b;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* View containers */
+        .view {
+            display: none;
+            animation: fadeIn 0.2s;
+        }
+        .view.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Overview */
+        .overview-header {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        .faction-logo {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: #2a2a2a;
+            border: 2px solid #444;
+        }
+        .overview-info h2 {
+            font-size: 2rem;
+            color: #fff;
+        }
+        .overview-info .tag {
+            color: #aaa;
+            font-size: 1.1rem;
+            margin: 5px 0;
+        }
+        .overview-info .stats {
+            color: #888;
+            font-size: 0.95rem;
+        }
+
+        /* Tables & Cards */
+        .card {
+            background: #252525;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid #333;
+            text-align: left;
+        }
+        .online { color: #2ecc71; font-weight: bold; }
+        .offline { color: #7f8c8d; }
+        .no-data {
+            color: #888;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .add-target {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .add-target input {
+            flex: 1;
+            padding: 6px;
+            background: #333;
+            border: 1px solid #555;
+            color: #ddd;
+            border-radius: 4px;
+        }
+        .add-target button, .delete-btn {
+            background: #2980b9;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .delete-btn {
+            background: #c0392b;
+            padding: 3px 8px;
+            font-size: 0.8rem;
+        }
+        .announcement-box {
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-style: italic;
+        }
+        .war-opponent-members {
+            margin-top: 20px;
+        }
+
+        .refresh-info {
+            margin-top: 25px;
+            font-size: 0.8rem;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h3 id="sidebarFactionName">Faction</h3>
+        <button class="nav-btn active" data-view="overview">🏠 Overview</button>
+        <button class="nav-btn" data-view="targets">🎯 Target List</button>
+        <button class="nav-btn" data-view="members">👥 Members</button>
+        <button class="nav-btn" data-view="war">⚔️ War</button>
+        <button class="nav-btn" data-view="announcement">📢 Announcement</button>
+        <button class="change-key" id="changeKeyBtn">Change API Key</button>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- API Key bar (visible until first success) -->
+        <div class="api-bar" id="apiBar">
+            <input type="text" id="apiKeyInput" placeholder="Enter your Torn API Key">
+            <button id="saveKeyBtn">💾 Save Key</button>
+            <button id="refreshBtn">🔄 Refresh</button>
+        </div>
+
+        <!-- Views -->
+        <div id="viewOverview" class="view active">
+            <div class="overview-header">
+                <img id="factionLogo" class="faction-logo" src="" alt="Faction Logo" style="display:none;">
+                <div class="overview-info">
+                    <h2 id="overviewName">Loading...</h2>
+                    <div class="tag" id="overviewTag"></div>
+                    <div class="stats">
+                        <span id="overviewMembers">Members: --</span> |
+                        <span id="overviewLeader">Leader: --</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="viewTargets" class="view">
+            <div class="card">
+                <div class="add-target">
+                    <input type="text" id="newTargetInput" placeholder="Enter target name or ID">
+                    <button id="addTargetBtn">Add</button>
+                </div>
+                <table>
+                    <thead><tr><th>Target</th><th>Action</th></tr></thead>
+                    <tbody id="targetListBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="viewMembers" class="view">
+            <div class="card">
+                <table>
+                    <thead><tr><th>Name</th><th>Level</th><th>Position</th><th>Status</th></tr></thead>
+                    <tbody id="memberListBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="viewWar" class="view">
+            <div class="card" id="warContent">Loading...</div>
+        </div>
+
+        <div id="viewAnnouncement" class="view">
+            <div class="card">
+                <div id="announcementContent" class="announcement-box">Loading...</div>
+            </div>
+        </div>
+
+        <div class="refresh-info">Auto-refreshes every 30 seconds | <span id="lastUpdate"></span></div>
+    </div>
+
+    <script>
+        // ---------- Configuration ----------
+        const DEFAULT_API_KEY = 'YOUR_API_KEY';
+
+        // ---------- State ----------
+        let apiKey = localStorage.getItem('torn_api_key') || DEFAULT_API_KEY;
+        let factionData = null;
+        let currentView = 'overview';
+
+        // ---------- DOM Elements ----------
+        const apiBar = document.getElementById('apiBar');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const saveKeyBtn = document.getElementById('saveKeyBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const changeKeyBtn = document.getElementById('changeKeyBtn');
+
+        // Sidebar
+        const sidebarFactionName = document.getElementById('sidebarFactionName');
+        const navBtns = document.querySelectorAll('.nav-btn');
+
+        // Overview
+        const factionLogo = document.getElementById('factionLogo');
+        const overviewName = document.getElementById('overviewName');
+        const overviewTag = document.getElementById('overviewTag');
+        const overviewMembers = document.getElementById('overviewMembers');
+        const overviewLeader = document.getElementById('overviewLeader');
+
+        // Views
+        const views = {
+            overview: document.getElementById('viewOverview'),
+            targets: document.getElementById('viewTargets'),
+            members: document.getElementById('viewMembers'),
+            war: document.getElementById('viewWar'),
+            announcement: document.getElementById('viewAnnouncement')
+        };
+
+        // Target list
+        const newTargetInput = document.getElementById('newTargetInput');
+        const addTargetBtn = document.getElementById('addTargetBtn');
+        const targetListBody = document.getElementById('targetListBody');
+
+        // Members
+        const memberListBody = document.getElementById('memberListBody');
+
+        // War
+        const warContent = document.getElementById('warContent');
+
+        // Announcement
+        const announcementContent = document.getElementById('announcementContent');
+
+        const lastUpdateSpan = document.getElementById('lastUpdate');
+
+        // ---------- Helpers ----------
+        function formatTime(timestamp) {
+            if (!timestamp) return 'Unknown';
+            return new Date(timestamp * 1000).toLocaleString('en-US');
+        }
+
+        function isOnline(lastActionTimestamp) {
+            if (!lastActionTimestamp) return false;
+            return (Math.floor(Date.now() / 1000) - lastActionTimestamp) < 300;
+        }
+
+        function escapeHtml(text) {
+            return String(text).replace(/[&<>"']/g, m => ({
+                '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+            })[m]);
+        }
+
+        // ---------- View Switching ----------
+        function switchView(viewName) {
+            currentView = viewName;
+            // Update buttons
+            navBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === viewName);
+            });
+            // Update content visibility
+            Object.keys(views).forEach(key => {
+                views[key].classList.toggle('active', key === viewName);
+            });
+            // Trigger rendering for the new view
+            renderCurrentView();
+        }
+
+        function renderCurrentView() {
+            switch (currentView) {
+                case 'overview': renderOverview(); break;
+                case 'targets': renderTargets(); break;
+                case 'members': renderMembersView(); break;
+                case 'war': renderWarView(); break;
+                case 'announcement': renderAnnouncementView(); break;
+            }
+        }
+
+        // ---------- Target List ----------
+        function getTargets() {
+            return JSON.parse(localStorage.getItem('torn_targets') || '[]');
+        }
+
+        function saveTargets(targets) {
+            localStorage.setItem('torn_targets', JSON.stringify(targets));
+        }
+
+        function renderTargets() {
+            const targets = getTargets();
+            targetListBody.innerHTML = targets.length === 0
+                ? '<tr><td colspan="2" class="no-data">No targets yet</td></tr>'
+                : targets.map((t, i) => `<tr>
+                    <td>${escapeHtml(t)}</td>
+                    <td><button class="delete-btn" data-index="${i}">Delete</button></td>
+                </tr>`).join('');
+
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.onclick = () => {
+                    const idx = parseInt(btn.dataset.index);
+                    const list = getTargets();
+                    list.splice(idx, 1);
+                    saveTargets(list);
+                    renderTargets();
+                };
+            });
+        }
+
+        function addTarget() {
+            const val = newTargetInput.value.trim();
+            if (!val) return;
+            const targets = getTargets();
+            targets.push(val);
+            saveTargets(targets);
+            newTargetInput.value = '';
+            renderTargets();
+        }
+
+        // ---------- Data Fetching ----------
+        async function fetchFactionData(showApiBarOnError = true) {
+            if (!apiKey || apiKey === 'YOUR_API_KEY') {
+                alert('Please enter a valid Torn API Key first!');
+                apiBar.classList.remove('hidden');
+                return false;
+            }
+            try {
+                const url = `https://api.torn.com/faction/?selections=basic,members&key=${apiKey}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error.error);
+                factionData = data;
+                // Hide API bar on first success
+                apiBar.classList.add('hidden');
+                // Update sidebar name
+                sidebarFactionName.textContent = data.name || 'Faction';
+                renderOverview();
+                renderCurrentView(); // update active view too
+                lastUpdateSpan.textContent = 'Last updated: ' + new Date().toLocaleTimeString('en-US');
+                return true;
+            } catch (err) {
+                console.error(err);
+                if (showApiBarOnError) {
+                    apiBar.classList.remove('hidden');
+                    alert('Failed to fetch faction data: ' + err.message);
+                }
+                return false;
+            }
+        }
+
+        async function fetchWarData() {
+            try {
+                const warRes = await fetch(`https://api.torn.com/faction/war?key=${apiKey}`);
+                if (!warRes.ok) return null;
+                const warData = await warRes.json();
+                if (warData.error) return null;
+                return warData.war || null;
+            } catch { return null; }
+        }
+
+        async function fetchOpponentFaction(factionId) {
+            try {
+                const res = await fetch(`https://api.torn.com/faction/${factionId}?selections=basic,members&key=${apiKey}`);
+                if (!res.ok) return null;
+                const data = await res.json();
+                return data.error ? null : data;
+            } catch { return null; }
+        }
+
+        // ---------- Render Functions ----------
+        function renderOverview() {
+            if (!factionData) {
+                overviewName.textContent = 'No data';
+                return;
+            }
+            const d = factionData;
+            factionLogo.src = `https://www.torn.com/images/factions/logo/${d.ID}.png`;
+            factionLogo.style.display = 'block';
+            factionLogo.onerror = () => { factionLogo.style.display = 'none'; };
+            overviewName.textContent = d.name || 'Unknown Faction';
+            overviewTag.textContent = d.tag ? `[${d.tag}]` : '';
+            const memberCount = d.members ? Object.keys(d.members).length : 0;
+            overviewMembers.textContent = `Members: ${memberCount}`;
+            const leader = d.leader || 'Unknown';
+            overviewLeader.textContent = `Leader: ${leader}`;
+        }
+
+        function renderMembersView() {
+            if (!factionData || !factionData.members) {
+                memberListBody.innerHTML = '<tr><td colspan="4" class="no-data">No member data</td></tr>';
+                return;
+            }
+            const members = Object.entries(factionData.members).map(([id, m]) => ({ id, ...m }));
+            members.sort((a, b) => {
+                const aOn = isOnline(a.last_action?.timestamp);
+                const bOn = isOnline(b.last_action?.timestamp);
+                if (aOn && !bOn) return -1;
+                if (!aOn && bOn) return 1;
+                return (b.level || 0) - (a.level || 0);
+            });
+            memberListBody.innerHTML = members.map(m => {
+                const online = isOnline(m.last_action?.timestamp);
+                return `<tr>
+                    <td>${escapeHtml(m.name)}</td>
+                    <td>${m.level}</td>
+                    <td>${escapeHtml(m.position || 'Member')}</td>
+                    <td class="${online ? 'online' : 'offline'}">${online ? '● Online' : '○ Offline'}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function renderWarView() {
+            warContent.innerHTML = '<div class="no-data">Checking war status...</div>';
+            const war = await fetchWarData();
+            if (!war) {
+                warContent.innerHTML = '<div class="no-data">No active faction war ⚔️</div>';
+                return;
+            }
+            const opponentId = war.target;
+            const opponent = await fetchOpponentFaction(opponentId);
+            let opponentName = opponentId, opponentTag = '', membersHtml = '';
+            if (opponent && !opponent.error) {
+                opponentName = opponent.name || opponentId;
+                opponentTag = opponent.tag ? `[${opponent.tag}]` : '';
+                if (opponent.members) {
+                    const mems = Object.values(opponent.members);
+                    membersHtml = mems.map(m => {
+                        const online = isOnline(m.last_action?.timestamp);
+                        return `<tr>
+                            <td>${escapeHtml(m.name)}</td>
+                            <td>${m.level}</td>
+                            <td class="${online ? 'online' : 'offline'}">${online ? 'Online' : 'Offline'}</td>
+                        </tr>`;
+                    }).join('');
+                } else {
+                    membersHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent members</td></tr>';
+                }
+            } else {
+                membersHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent info</td></tr>';
+            }
+            warContent.innerHTML = `
+                <div style="margin-bottom:20px;">
+                    <strong>Opponent:</strong> ${escapeHtml(opponentName)} ${escapeHtml(opponentTag)}<br>
+                    <strong>Score:</strong> Us ${war.score || 0} - ${war.target_score || 0} Them<br>
+                    <strong>Ends:</strong> ${formatTime(war.end)}
+                </div>
+                <div class="war-opponent-members">
+                    <h3>Opponent Members & Status</h3>
+                    <table>
+                        <thead><tr><th>Name</th><th>Level</th><th>Status</th></tr></thead>
+                        <tbody>${membersHtml}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function renderAnnouncementView() {
+            if (factionData && factionData.announcement && factionData.announcement.text) {
+                announcementContent.textContent = factionData.announcement.text;
+            } else {
+                announcementContent.textContent = 'No announcement';
+            }
+        }
+
+        // ---------- Events ----------
+        navBtns.forEach(btn => {
+            btn.addEventListener('click', () => switchView(btn.dataset.view));
+        });
+
+        saveKeyBtn.addEventListener('click', () => {
+            const newKey = apiKeyInput.value.trim();
+            if (!newKey) return alert('Key cannot be empty');
+            apiKey = newKey;
+            localStorage.setItem('torn_api_key', apiKey);
+            fetchFactionData();
+        });
+
+        refreshBtn.addEventListener('click', () => fetchFactionData());
+
+        changeKeyBtn.addEventListener('click', () => {
+            apiBar.classList.remove('hidden');
+            apiKeyInput.focus();
+        });
+
+        addTargetBtn.addEventListener('click', addTarget);
+        newTargetInput.addEventListener('keypress', e => { if (e.key === 'Enter') addTarget(); });
+
+        // ---------- Init ----------
+        apiKeyInput.value = apiKey;
+        renderTargets(); // prepare target list data
+
+        // Attempt initial load with saved key (show bar if needed)
+        fetchFactionData(false).then(success => {
+            if (!success) apiBar.classList.remove('hidden');
+        });
+
+        // Auto refresh every 30s (only basic data, war is loaded on view)
+        setInterval(() => fetchFactionData(false), 30000);
+    </script>
+</body>
+</html>
