@@ -112,7 +112,7 @@
 
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const SLOTS = 48;
-        const ONLINE_THRESHOLD_SEC = 300; // 5 minutes
+        const ONLINE_THRESHOLD_SEC = 300;
 
         let currentUser = null;
         let pollInterval = null;
@@ -147,29 +147,45 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API ----------
-        // Fetch player basic info (name, id)
+        // ---------- Torn API (v2 with v1 fallback) ----------
         async function fetchBasicInfo(key) {
-            const url = `https://api.torn.com/v2/user?key=${key}`;
-            const res = await fetch(url);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error.error || json.error);
-            const data = json.data || json;
+            // Try v2
+            let url = `https://api.torn.com/v2/user?key=${key}`;
+            let res = await fetch(url);
+            let json = await res.json();
+            let data = json.data || json;
+
+            // If v2 missing player_id, try v1
+            if (!data.player_id) {
+                logToDebug('[Torn] v2 response missing player_id, trying v1...');
+                url = `https://api.torn.com/user/?selections=basic&key=${key}`;
+                res = await fetch(url);
+                json = await res.json();
+                if (json.error) throw new Error(json.error.error || json.error);
+                data = json; // v1 returns flat object
+            }
+
+            if (!data.player_id) {
+                throw new Error('No player_id in API response');
+            }
             return { id: data.player_id, name: data.name };
         }
 
-        // Fetch last 100 logs to determine recent activity
         async function fetchLogs(key) {
-            // request logs selection (v2 endpoint)
-            const url = `https://api.torn.com/v2/user?selections=logs&key=${key}`;
-            const res = await fetch(url);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error.error || json.error);
+            // Try v2 with logs selection
+            let url = `https://api.torn.com/v2/user?selections=logs&key=${key}`;
+            let res = await fetch(url);
+            let json = await res.json();
+            if (json.error) {
+                // fallback to v1
+                url = `https://api.torn.com/user/?selections=logs&key=${key}`;
+                res = await fetch(url);
+                json = await res.json();
+                if (json.error) throw new Error(json.error.error || json.error);
+            }
             const data = json.data || json;
-            // logs are in data.logs, which is an object keyed by log id
             const logs = data.logs;
             if (!logs || Object.keys(logs).length === 0) return [];
-            // Convert to array and sort by timestamp descending (newest first)
             return Object.values(logs).sort((a, b) => b.timestamp - a.timestamp);
         }
 
@@ -179,15 +195,19 @@
                 return user;
             } catch (err) {
                 logToDebug('[Torn] Key verification failed: ' + err.message);
+                // Show raw response in debug box
+                try {
+                    const res = await fetch(`https://api.torn.com/v2/user?key=${key}`);
+                    const json = await res.json();
+                    logToDebug('Raw v2 response: ' + JSON.stringify(json).slice(0, 500));
+                } catch(e) {}
                 return null;
             }
         }
 
         async function checkOnlineStatus(key) {
             try {
-                // Fetch logs
                 const logs = await fetchLogs(key);
-                // Display snippet
                 const snippet = JSON.stringify(logs.slice(0, 3), null, 2);
                 clearDebug();
                 logToDebug('✅ Latest 3 log entries:\n' + snippet);
@@ -205,7 +225,6 @@
                 const nowSec = Math.floor(Date.now() / 1000);
                 const secondsAgo = nowSec - timestamp;
                 const online = secondsAgo < ONLINE_THRESHOLD_SEC;
-                // Return also the log description for display
                 return {
                     online,
                     lastActivity: timestamp,
