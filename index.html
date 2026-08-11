@@ -39,7 +39,7 @@
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
             padding: 12px; margin: 10px auto 20px; max-width: 700px;
             font-family: monospace; font-size: 0.75rem; color: #8b949e;
-            white-space: pre-wrap; word-break: break-all;
+            white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto;
         }
         .grid-container {
             overflow-x: auto; background: #161b22; border: 1px solid #30363d;
@@ -68,10 +68,7 @@
             border-radius: 4px; cursor: pointer;
         }
         .hint {
-            color: #f0c040;
-            text-align: center;
-            font-size: 0.8rem;
-            margin-top: 5px;
+            color: #f0c040; text-align: center; font-size: 0.8rem; margin-top: 5px;
         }
     </style>
 </head>
@@ -103,19 +100,19 @@
 
     <div class="debug-box" id="debugBox">
         <strong>🔍 API Response Inspector</strong><br>
-        (Click Refresh Grid Now to see Torn API raw response)
+        (Click Refresh Grid Now to see raw Torn API response)
     </div>
     <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
     <div id="permissionHint" class="hint"></div>
 
     <script>
-        // ========== CONFIG ==========
+        // ========== SUPABASE CONFIG ==========
         const SUPABASE_URL = 'https://ohgvzzcojnjqzvyizyxs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M';
 
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const SLOTS = 48;
-        const ONLINE_THRESHOLD_SEC = 300;
+        const ONLINE_THRESHOLD_SEC = 300; // 5 minutes
 
         let currentUser = null;
         let pollInterval = null;
@@ -150,29 +147,36 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API with dual strategy ----------
-        async function fetchUserData(key) {
-            // Strategy 1: plain v2/user
-            let url = `https://api.torn.com/v2/user?key=${key}`;
-            let res = await fetch(url);
-            let json = await res.json();
-            if (json.error) {
-                // If it fails, try with selections=basic
-                url = `https://api.torn.com/v2/user?selections=basic&key=${key}`;
-                res = await fetch(url);
-                json = await res.json();
-                if (json.error) throw new Error(json.error.error || json.error);
-            }
-            // Some v2 responses wrap data in "data"
-            return json.data || json;
+        // ---------- Torn API ----------
+        // Fetch player basic info (name, id)
+        async function fetchBasicInfo(key) {
+            const url = `https://api.torn.com/v2/user?key=${key}`;
+            const res = await fetch(url);
+            const json = await res.json();
+            if (json.error) throw new Error(json.error.error || json.error);
+            const data = json.data || json;
+            return { id: data.player_id, name: data.name };
+        }
+
+        // Fetch last 100 logs to determine recent activity
+        async function fetchLogs(key) {
+            // request logs selection (v2 endpoint)
+            const url = `https://api.torn.com/v2/user?selections=logs&key=${key}`;
+            const res = await fetch(url);
+            const json = await res.json();
+            if (json.error) throw new Error(json.error.error || json.error);
+            const data = json.data || json;
+            // logs are in data.logs, which is an object keyed by log id
+            const logs = data.logs;
+            if (!logs || Object.keys(logs).length === 0) return [];
+            // Convert to array and sort by timestamp descending (newest first)
+            return Object.values(logs).sort((a, b) => b.timestamp - a.timestamp);
         }
 
         async function verifyTornKey(key) {
             try {
-                const data = await fetchUserData(key);
-                // Must have player_id to be valid
-                if (!data.player_id) throw new Error('No player_id in response');
-                return { id: data.player_id, name: data.name };
+                const user = await fetchBasicInfo(key);
+                return user;
             } catch (err) {
                 logToDebug('[Torn] Key verification failed: ' + err.message);
                 return null;
@@ -181,30 +185,38 @@
 
         async function checkOnlineStatus(key) {
             try {
-                const data = await fetchUserData(key);
-                // Show raw data snippet in debug box
-                const snippet = JSON.stringify(data, null, 2).slice(0, 500);
+                // Fetch logs
+                const logs = await fetchLogs(key);
+                // Display snippet
+                const snippet = JSON.stringify(logs.slice(0, 3), null, 2);
                 clearDebug();
-                logToDebug('✅ Torn API response (first 500 chars):\n' + snippet);
+                logToDebug('✅ Latest 3 log entries:\n' + snippet);
 
-                const lastAction = data.last_action;
-                if (!lastAction || !lastAction.timestamp) {
+                if (!logs.length) {
                     document.getElementById('permissionHint').innerHTML =
-                        '⚠️ <b>last_action is missing.</b> Your API key may lack "basic" permission.<br>' +
-                        'Go to <a href="https://www.torn.com/settings/api" target="_blank">Torn API Settings</a>, ' +
-                        'select your key, and ensure <b>"basic"</b> is checked.<br>' +
-                        'Then refresh this page and try again.';
-                    return { online: false, lastAction: null, secondsAgo: null };
+                        '⚠️ No log entries found. Your API key may lack "logs" permission.<br>' +
+                        'Go to <a href="https://www.torn.com/preferences.php?step=api" target="_blank">Torn API Settings</a>, ' +
+                        'select your key and enable <b>"logs"</b>, or create a new key with default permissions.';
+                    return { online: false, lastActivity: null, secondsAgo: null };
                 }
 
-                const timestamp = lastAction.timestamp;
+                const latestLog = logs[0];
+                const timestamp = latestLog.timestamp;
                 const nowSec = Math.floor(Date.now() / 1000);
                 const secondsAgo = nowSec - timestamp;
                 const online = secondsAgo < ONLINE_THRESHOLD_SEC;
-                return { online, lastAction: timestamp, secondsAgo };
+                // Return also the log description for display
+                return {
+                    online,
+                    lastActivity: timestamp,
+                    secondsAgo,
+                    logDescription: latestLog.log || latestLog.title || 'Unknown'
+                };
             } catch (err) {
-                logToDebug('[Torn] Online check error: ' + err.message);
-                return { online: false, lastAction: null, secondsAgo: null };
+                logToDebug('[Torn] Logs fetch error: ' + err.message);
+                document.getElementById('permissionHint').innerHTML =
+                    '❌ Unable to fetch logs. Please ensure your API key has "logs" permission.';
+                return { online: false, lastActivity: null, secondsAgo: null };
             }
         }
 
@@ -263,7 +275,7 @@
             if (!savedKey) return;
 
             document.getElementById('permissionHint').innerHTML = '';
-            logToDebug('Checking online status...');
+            logToDebug('Checking recent activity via logs...');
             const status = await checkOnlineStatus(savedKey);
 
             document.getElementById('onlineStatus').style.display = 'block';
@@ -276,16 +288,19 @@
                 statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
             }
 
-            if (status.lastAction) {
-                const dateStr = new Date(status.lastAction * 1000).toLocaleString();
-                lastActionInfo.textContent = `Last action: ${status.lastAction} (${dateStr}) · ${status.secondsAgo}s ago`;
+            if (status.lastActivity) {
+                const dateStr = new Date(status.lastActivity * 1000).toLocaleString();
+                lastActionInfo.innerHTML = `Last log: ${status.logDescription} at ${dateStr} · ${status.secondsAgo}s ago`;
             } else {
-                lastActionInfo.textContent = 'No last_action available';
+                lastActionInfo.textContent = 'No recent activity';
             }
 
             if (status.online) {
                 const { date, slot } = getCurrentDateAndSlot();
                 await upsertPresence(currentUser.id, date, slot);
+                logToDebug(`✅ Marked online at slot ${slot}`);
+            } else {
+                logToDebug(`⏸ Inactive or no logs available`);
             }
         }
 
