@@ -227,14 +227,12 @@
 
     <!-- Main Content -->
     <div class="main-content">
-        <!-- API Key bar -->
         <div class="api-bar" id="apiBar">
             <input type="text" id="apiKeyInput" placeholder="Enter your Torn API Key">
             <button id="saveKeyBtn">💾 Save Key</button>
             <button id="refreshBtn">🔄 Refresh</button>
         </div>
 
-        <!-- Views -->
         <div id="viewOverview" class="view active">
             <div class="overview-header">
                 <img id="factionLogo" class="faction-logo" src="" alt="Faction Logo" style="display:none;">
@@ -285,15 +283,12 @@
     </div>
 
     <script>
-        // ---------- Configuration ----------
         const DEFAULT_API_KEY = 'YOUR_API_KEY';
-
-        // ---------- State ----------
         let apiKey = localStorage.getItem('torn_api_key') || DEFAULT_API_KEY;
-        let factionData = null;
+        let factionData = null;        // will hold combined basic + members
         let currentView = 'overview';
 
-        // ---------- DOM Elements ----------
+        // ---------- DOM ----------
         const apiBar = document.getElementById('apiBar');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveKeyBtn = document.getElementById('saveKeyBtn');
@@ -320,7 +315,6 @@
         const newTargetInput = document.getElementById('newTargetInput');
         const addTargetBtn = document.getElementById('addTargetBtn');
         const targetListBody = document.getElementById('targetListBody');
-
         const memberListBody = document.getElementById('memberListBody');
         const warContent = document.getElementById('warContent');
         const announcementContent = document.getElementById('announcementContent');
@@ -361,15 +355,13 @@
             }
         }
 
-        // ---------- Target List ----------
+        // ---------- Target List (local storage) ----------
         function getTargets() {
             return JSON.parse(localStorage.getItem('torn_targets') || '[]');
         }
-
         function saveTargets(targets) {
             localStorage.setItem('torn_targets', JSON.stringify(targets));
         }
-
         function renderTargets() {
             const targets = getTargets();
             targetListBody.innerHTML = targets.length === 0
@@ -378,7 +370,6 @@
                     <td>${escapeHtml(t)}</td>
                     <td><button class="delete-btn" data-index="${i}">Delete</button></td>
                 </tr>`).join('');
-
             document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.onclick = () => {
                     const idx = parseInt(btn.dataset.index);
@@ -389,7 +380,6 @@
                 };
             });
         }
-
         function addTarget() {
             const val = newTargetInput.value.trim();
             if (!val) return;
@@ -400,59 +390,83 @@
             renderTargets();
         }
 
-        // ---------- Data Fetching (API v2) ----------
-        async function fetchFactionData(showApiBarOnError = true) {
+        // ---------- API v2 Calls ----------
+        async function fetchFactionBasic() {
+            const res = await fetch(`https://api.torn.com/v2/faction?key=${apiKey}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.error);
+            return data;
+        }
+
+        async function fetchFactionMembers() {
+            const res = await fetch(`https://api.torn.com/v2/faction/members?key=${apiKey}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.error);
+            return data; // structure may be { members: {...} }
+        }
+
+        async function fetchOpponentBasic(factionId) {
+            const res = await fetch(`https://api.torn.com/v2/faction/${factionId}?key=${apiKey}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.error);
+            return data;
+        }
+
+        async function fetchOpponentMembers(factionId) {
+            const res = await fetch(`https://api.torn.com/v2/faction/${factionId}/members?key=${apiKey}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.error);
+            return data;
+        }
+
+        async function fetchWar() {
+            const res = await fetch(`https://api.torn.com/v2/faction/war?key=${apiKey}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.error);
+            return data.war || null;
+        }
+
+        // ---------- Main Data Fetch ----------
+        async function loadAllData(showApiBarOnError = true) {
             if (!apiKey || apiKey === 'YOUR_API_KEY') {
                 alert('Please enter a valid Torn API Key first!');
                 apiBar.classList.remove('hidden');
                 return false;
             }
             try {
-                // ✅ Updated to API v2
-                const url = `https://api.torn.com/v2/faction?selections=basic,members&key=${apiKey}`;
-                const res = await fetch(url);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                if (data.error) throw new Error(data.error.error);
-                factionData = data;
+                const [basic, members] = await Promise.all([
+                    fetchFactionBasic(),
+                    fetchFactionMembers()
+                ]);
+                // Combine: API v2 members might be structured differently.
+                // The members endpoint typically returns { members: { ... } }
+                const membersObj = members.members || members; // fallback
+                factionData = {
+                    ...basic,
+                    members: membersObj
+                };
                 apiBar.classList.add('hidden');
-                sidebarFactionName.textContent = data.name || 'Faction';
+                sidebarFactionName.textContent = basic.name || 'Faction';
                 renderOverview();
-                renderCurrentView();
+                renderCurrentView(); // render active view with new data
                 lastUpdateSpan.textContent = 'Last updated: ' + new Date().toLocaleTimeString('en-US');
                 return true;
             } catch (err) {
                 console.error(err);
                 if (showApiBarOnError) {
                     apiBar.classList.remove('hidden');
-                    alert('Failed to fetch faction data: ' + err.message);
+                    alert('Failed to load faction data: ' + err.message);
                 }
                 return false;
             }
         }
 
-        async function fetchWarData() {
-            try {
-                // ✅ Updated to API v2
-                const warRes = await fetch(`https://api.torn.com/v2/faction/war?key=${apiKey}`);
-                if (!warRes.ok) return null;
-                const warData = await warRes.json();
-                if (warData.error) return null;
-                return warData.war || null;
-            } catch { return null; }
-        }
-
-        async function fetchOpponentFaction(factionId) {
-            try {
-                // ✅ Updated to API v2
-                const res = await fetch(`https://api.torn.com/v2/faction/${factionId}?selections=basic,members&key=${apiKey}`);
-                if (!res.ok) return null;
-                const data = await res.json();
-                return data.error ? null : data;
-            } catch { return null; }
-        }
-
-        // ---------- Render Functions ----------
+        // ---------- Render functions ----------
         function renderOverview() {
             if (!factionData) {
                 overviewName.textContent = 'No data';
@@ -466,8 +480,7 @@
             overviewTag.textContent = d.tag ? `[${d.tag}]` : '';
             const memberCount = d.members ? Object.keys(d.members).length : 0;
             overviewMembers.textContent = `Members: ${memberCount}`;
-            const leader = d.leader || 'Unknown';
-            overviewLeader.textContent = `Leader: ${leader}`;
+            overviewLeader.textContent = `Leader: ${d.leader || 'Unknown'}`;
         }
 
         function renderMembersView() {
@@ -496,19 +509,29 @@
 
         async function renderWarView() {
             warContent.innerHTML = '<div class="no-data">Checking war status...</div>';
-            const war = await fetchWarData();
+            let war;
+            try {
+                war = await fetchWar();
+            } catch {
+                warContent.innerHTML = '<div class="no-data">Unable to check war status</div>';
+                return;
+            }
             if (!war) {
                 warContent.innerHTML = '<div class="no-data">No active faction war ⚔️</div>';
                 return;
             }
             const opponentId = war.target;
-            const opponent = await fetchOpponentFaction(opponentId);
             let opponentName = opponentId, opponentTag = '', membersHtml = '';
-            if (opponent && !opponent.error) {
-                opponentName = opponent.name || opponentId;
-                opponentTag = opponent.tag ? `[${opponent.tag}]` : '';
-                if (opponent.members) {
-                    const mems = Object.values(opponent.members);
+            try {
+                const [oppBasic, oppMembers] = await Promise.all([
+                    fetchOpponentBasic(opponentId),
+                    fetchOpponentMembers(opponentId)
+                ]);
+                opponentName = oppBasic.name || opponentId;
+                opponentTag = oppBasic.tag ? `[${oppBasic.tag}]` : '';
+                const membersObj = oppMembers.members || oppMembers;
+                if (membersObj && Object.keys(membersObj).length > 0) {
+                    const mems = Object.values(membersObj);
                     membersHtml = mems.map(m => {
                         const online = isOnline(m.last_action?.timestamp);
                         return `<tr>
@@ -520,7 +543,7 @@
                 } else {
                     membersHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent members</td></tr>';
                 }
-            } else {
+            } catch (err) {
                 membersHtml = '<tr><td colspan="3" class="no-data">Unable to fetch opponent info</td></tr>';
             }
             warContent.innerHTML = `
@@ -548,19 +571,17 @@
         }
 
         // ---------- Events ----------
-        navBtns.forEach(btn => {
-            btn.addEventListener('click', () => switchView(btn.dataset.view));
-        });
+        navBtns.forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
 
         saveKeyBtn.addEventListener('click', () => {
             const newKey = apiKeyInput.value.trim();
             if (!newKey) return alert('Key cannot be empty');
             apiKey = newKey;
             localStorage.setItem('torn_api_key', apiKey);
-            fetchFactionData();
+            loadAllData();
         });
 
-        refreshBtn.addEventListener('click', () => fetchFactionData());
+        refreshBtn.addEventListener('click', () => loadAllData());
 
         changeKeyBtn.addEventListener('click', () => {
             apiBar.classList.remove('hidden');
@@ -574,11 +595,12 @@
         apiKeyInput.value = apiKey;
         renderTargets();
 
-        fetchFactionData(false).then(success => {
+        loadAllData(false).then(success => {
             if (!success) apiBar.classList.remove('hidden');
         });
 
-        setInterval(() => fetchFactionData(false), 30000);
+        // Auto refresh (basic + members only, war is loaded on demand)
+        setInterval(() => loadAllData(false), 30000);
     </script>
 </body>
 </html>
