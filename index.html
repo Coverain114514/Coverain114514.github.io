@@ -15,7 +15,7 @@
         h1 { text-align: center; color: #58a6ff; margin-bottom: 12px; }
         .login-panel {
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-            padding: 16px; max-width: 580px; margin: 0 auto 20px;
+            padding: 16px; max-width: 620px; margin: 0 auto 20px;
             display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;
         }
         .login-panel input {
@@ -31,10 +31,14 @@
         }
         .user-badge strong { color: #f0c040; }
         .status-indicator {
-            text-align: center; margin-bottom: 12px; font-size: 1.1rem;
+            text-align: center; margin-bottom: 8px; font-size: 0.95rem;
         }
         .status-online { color: #3fb950; font-weight: bold; }
         .status-offline { color: #f85149; font-weight: bold; }
+        .debug-info {
+            text-align: center; font-size: 0.8rem; color: #8b949e; margin-bottom: 12px;
+            font-family: monospace;
+        }
         .grid-container {
             overflow-x: auto; background: #161b22; border: 1px solid #30363d;
             border-radius: 8px; padding: 10px;
@@ -77,7 +81,8 @@
 
     <div id="onlineStatus" class="status-indicator" style="display:none;">
         Current Torn status: <span id="statusText"></span>
-        <br><small id="lastActionInfo"></small>
+        <br>
+        <span id="lastActionInfo" class="debug-info"></span>
     </div>
 
     <button id="manualRefreshBtn" class="manual-refresh">🔄 Refresh Grid Now</button>
@@ -87,7 +92,7 @@
     <div class="grid-container" id="gridContainer">
         <p style="text-align:center;padding:30px;color:#8b949e;">Sign in to see the schedule.</p>
     </div>
-    <div class="refresh-note">Auto‑checks every 15 seconds · Marks persist all week</div>
+    <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
 
     <script>
         // ========== SUPABASE CONFIG ==========
@@ -95,9 +100,8 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M';
 
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const SLOTS = 48; // half‑hour slots
+        const SLOTS = 48;
         const ONLINE_THRESHOLD_SEC = 300; // 5 minutes
-        const CHECK_INTERVAL = 15000; // 15 seconds
 
         let currentUser = null;
         let pollInterval = null;
@@ -122,7 +126,7 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API ----------
+        // ---------- Torn API (with full debug info) ----------
         async function verifyTornKey(key) {
             try {
                 const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
@@ -139,15 +143,22 @@
             try {
                 const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
                 const data = await res.json();
-                if (data.error) return { online: false, lastAction: null, secondsAgo: null };
-                const last = data.last_action?.timestamp;
-                if (!last) return { online: false, lastAction: null, secondsAgo: null };
+                if (data.error) return { online: false, lastAction: null, secondsAgo: null, rawData: null };
+
+                const lastAction = data.last_action;
+                const timestamp = lastAction?.timestamp;
+                if (!timestamp) {
+                    console.warn('[Torn] No last_action in response, full data:', data);
+                    return { online: false, lastAction: null, secondsAgo: null, rawData: data };
+                }
+
                 const nowSec = Math.floor(Date.now() / 1000);
-                const secondsAgo = nowSec - last;
-                return { online: secondsAgo < ONLINE_THRESHOLD_SEC, lastAction: last, secondsAgo };
+                const secondsAgo = nowSec - timestamp;
+                const online = secondsAgo < ONLINE_THRESHOLD_SEC;
+                return { online, lastAction: timestamp, secondsAgo, rawData: data };
             } catch (err) {
                 console.error('[Torn] Online check error:', err);
-                return { online: false, lastAction: null, secondsAgo: null };
+                return { online: false, lastAction: null, secondsAgo: null, rawData: null };
             }
         }
 
@@ -195,7 +206,7 @@
             return await res.json();
         }
 
-        // ---------- Update presence (only when online) ----------
+        // ---------- Update presence ----------
         async function updateMyPresence() {
             if (!currentUser) return;
             const savedKey = localStorage.getItem('torn_api_key');
@@ -203,28 +214,32 @@
 
             const status = await checkOnlineStatus(savedKey);
 
-            const statusDiv = document.getElementById('onlineStatus');
+            // Update UI with full debug info
+            const onlineStatusDiv = document.getElementById('onlineStatus');
             const statusText = document.getElementById('statusText');
             const lastActionInfo = document.getElementById('lastActionInfo');
-            if (statusDiv && statusText) {
-                statusDiv.style.display = 'block';
-                if (status.online) {
-                    statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
-                    lastActionInfo.textContent = `Last action ${status.secondsAgo}s ago`;
-                } else {
-                    statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
-                    lastActionInfo.textContent = status.secondsAgo !== null
-                        ? `Last action ${status.secondsAgo}s ago`
-                        : 'Cannot determine last action';
-                }
+            onlineStatusDiv.style.display = 'block';
+
+            if (status.online) {
+                statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
+            } else {
+                statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
             }
 
+            if (status.lastAction) {
+                const dateStr = new Date(status.lastAction * 1000).toLocaleString();
+                lastActionInfo.innerHTML = `Last action timestamp: ${status.lastAction} (${dateStr}) · ${status.secondsAgo}s ago`;
+            } else {
+                lastActionInfo.innerHTML = 'No last_action data returned from API – check API key permissions or selections.';
+            }
+
+            // Write presence if online
             if (status.online) {
                 const { date, slot } = getCurrentDateAndSlot();
                 await upsertPresence(currentUser.id, date, slot);
                 console.log(`✅ Marked online at slot ${slot}`);
             } else {
-                console.log(`⏸ Offline, no mark removed`);
+                console.log(`⏸ Offline or no last_action data`);
             }
         }
 
@@ -286,8 +301,8 @@
             await updateMyPresence();
             await loadAndRenderGrid();
 
-            pollInterval = setInterval(updateMyPresence, CHECK_INTERVAL);
-            gridRefreshInterval = setInterval(loadAndRenderGrid, CHECK_INTERVAL);
+            pollInterval = setInterval(updateMyPresence, 30000);
+            gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
         }
 
         // ---------- Bind events ----------
@@ -317,8 +332,8 @@
                     document.getElementById('loginBtn').textContent = '🔄 Signed in';
                     await updateMyPresence();
                     await loadAndRenderGrid();
-                    pollInterval = setInterval(updateMyPresence, CHECK_INTERVAL);
-                    gridRefreshInterval = setInterval(loadAndRenderGrid, CHECK_INTERVAL);
+                    pollInterval = setInterval(updateMyPresence, 30000);
+                    gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
                 }
             }
         })();
