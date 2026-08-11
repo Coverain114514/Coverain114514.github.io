@@ -306,29 +306,34 @@
             renderTargets();
         }
 
-        // Data fetching
+        // Data fetching (API v2, unwrapping "data" field)
         async function fetchFaction() {
             const res = await fetch(`https://api.torn.com/v2/faction?key=${apiKey}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            if (data.error) throw new Error(data.error.error);
-            return data; // Contains name, tag, leader, members, announcement, etc.
+            const json = await res.json();
+            if (json.error) throw new Error(json.error.error);
+            // API v2 wraps response in "data" for this endpoint
+            return json.data || json;
         }
 
         async function fetchOpponent(id) {
             const res = await fetch(`https://api.torn.com/v2/faction/${id}?key=${apiKey}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            if (data.error) throw new Error(data.error.error);
-            return data;
+            const json = await res.json();
+            if (json.error) throw new Error(json.error.error);
+            return json.data || json;
         }
 
         async function fetchWar() {
-            const res = await fetch(`https://api.torn.com/v2/faction/war?key=${apiKey}`);
-            if (!res.ok) return null; // No war or error
-            const data = await res.json();
-            if (data.error) return null; // e.g. error code 11 for no active war
-            return data.war || null;
+            try {
+                const res = await fetch(`https://api.torn.com/v2/faction/war?key=${apiKey}`);
+                if (!res.ok) return null;
+                const json = await res.json();
+                if (json.error) return null; // e.g., error code 11
+                return json.data ? json.data.war : json.war || null;
+            } catch {
+                return null;
+            }
         }
 
         // Main load
@@ -360,7 +365,7 @@
         function renderOverview() {
             if (!factionData) { overviewName.textContent = 'No data'; return; }
             const d = factionData;
-            factionLogo.src = `https://www.torn.com/images/factions/logo/${d.id}.png`; // Torn v2 uses 'id'
+            factionLogo.src = `https://www.torn.com/images/factions/logo/${d.id}.png`; // v2 uses 'id'
             factionLogo.style.display = 'block';
             factionLogo.onerror = () => factionLogo.style.display = 'none';
             overviewName.textContent = d.name || 'Unknown Faction';
