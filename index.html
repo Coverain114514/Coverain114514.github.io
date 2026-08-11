@@ -72,6 +72,12 @@
             margin-top: 10px;
             white-space: pre-wrap;
         }
+        .permission-hint {
+            color: #f0c040;
+            text-align: center;
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -101,6 +107,7 @@
     </div>
     <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
     <div id="errorLog" class="error-log"></div>
+    <div id="permissionHint" class="permission-hint"></div>
 
     <script>
         // ========== SUPABASE CONFIG ==========
@@ -145,14 +152,40 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API v2 (no selections parameter) ----------
-        async function verifyTornKey(key) {
+        // ---------- Torn API with fallback ----------
+        async function fetchUserData(key) {
+            // First attempt: selections=basic (might still work)
             try {
-                const res = await fetch(`https://api.torn.com/v2/user?key=${key}`);
+                const url = `https://api.torn.com/v2/user?selections=basic&key=${key}`;
+                const res = await fetch(url);
+                const json = await res.json();
+                if (!json.error) {
+                    const data = json.data || json;
+                    if (data.player_id) return data;
+                }
+                if (json.error && json.error.error === 'Wrong fields') {
+                    // fallback to default request
+                    throw new Error('WRONG_FIELDS');
+                }
+            } catch (e) {
+                if (e.message !== 'WRONG_FIELDS') console.warn('First attempt failed:', e);
+            }
+
+            // Second attempt: plain /v2/user
+            try {
+                const url = `https://api.torn.com/v2/user?key=${key}`;
+                const res = await fetch(url);
                 const json = await res.json();
                 if (json.error) throw new Error(json.error.error || json.error);
-                // v2 wraps response in "data" sometimes, but /user returns flat
-                const data = json.data || json;
+                return json.data || json;
+            } catch (e) {
+                throw new Error('Torn API request failed: ' + e.message);
+            }
+        }
+
+        async function verifyTornKey(key) {
+            try {
+                const data = await fetchUserData(key);
                 return { id: data.player_id, name: data.name };
             } catch (err) {
                 logToPage('[Torn] Key verification failed: ' + err.message);
@@ -162,22 +195,21 @@
 
         async function checkOnlineStatus(key) {
             try {
-                const res = await fetch(`https://api.torn.com/v2/user?key=${key}`);
-                const json = await res.json();
-                if (json.error) {
-                    return { online: false, lastAction: null, secondsAgo: null };
-                }
-                const data = json.data || json;
+                const data = await fetchUserData(key);
                 const lastAction = data.last_action;
                 if (!lastAction || !lastAction.timestamp) {
-                    logToPage('[Torn] No last_action in response.');
-                    return { online: false, lastAction: null, secondsAgo: null, rawData: data };
+                    document.getElementById('permissionHint').innerHTML =
+                        '⚠️ <b>last_action not returned.</b> Your API key may lack "basic" permission.<br>' +
+                        'Go to <a href="https://www.torn.com/settings/api" target="_blank">Torn API Keys</a>, ' +
+                        'select your key, and ensure <b>"basic"</b> is enabled.<br>' +
+                        'Then refresh this page.';
+                    return { online: false, lastAction: null, secondsAgo: null };
                 }
                 const timestamp = lastAction.timestamp;
                 const nowSec = Math.floor(Date.now() / 1000);
                 const secondsAgo = nowSec - timestamp;
                 const online = secondsAgo < ONLINE_THRESHOLD_SEC;
-                return { online, lastAction: timestamp, secondsAgo, rawData: data };
+                return { online, lastAction: timestamp, secondsAgo };
             } catch (err) {
                 logToPage('[Torn] Online check error: ' + err.message);
                 return { online: false, lastAction: null, secondsAgo: null };
@@ -193,7 +225,7 @@
             return { date: dateStr, slot };
         }
 
-        // ---------- Supabase REST ----------
+        // ---------- Supabase REST (unchanged) ----------
         function supabaseHeaders() {
             return {
                 'apikey': SUPABASE_ANON_KEY,
@@ -250,14 +282,12 @@
 
         // ---------- Update presence ----------
         async function updateMyPresence() {
-            if (!currentUser) {
-                logToPage('updateMyPresence: Not logged in.');
-                return;
-            }
+            if (!currentUser) return;
             const savedKey = localStorage.getItem('torn_api_key');
             if (!savedKey) return;
 
             clearLog();
+            document.getElementById('permissionHint').innerHTML = '';
             logToPage('Checking online status...');
             const status = await checkOnlineStatus(savedKey);
 
@@ -275,7 +305,7 @@
                 const dateStr = new Date(status.lastAction * 1000).toLocaleString();
                 lastActionInfo.innerHTML = `Last action: ${status.lastAction} (${dateStr}) · ${status.secondsAgo}s ago`;
             } else {
-                lastActionInfo.innerHTML = '⚠ No last_action data – check your API key permissions.';
+                lastActionInfo.innerHTML = '⚠ No last_action data – see hint below.';
             }
 
             if (status.online) {
@@ -326,12 +356,13 @@
             document.getElementById('gridContainer').innerHTML = html;
         }
 
-        // ---------- Public methods bound to onclick ----------
+        // ---------- Login ----------
         window.handleLogin = async function() {
             const key = document.getElementById('apiKeyInput').value.trim();
             if (!key) return alert('Please enter your Torn API key');
 
             clearLog();
+            document.getElementById('permissionHint').innerHTML = '';
             logToPage('Verifying key...');
             const user = await verifyTornKey(key);
             if (!user) {
@@ -359,20 +390,17 @@
 
         window.handleManualRefresh = async function() {
             clearLog();
+            document.getElementById('permissionHint').innerHTML = '';
             logToPage('Manual refresh clicked...');
             if (!currentUser) {
                 alert('Please sign in first.');
                 return;
             }
-            try {
-                await updateMyPresence();
-                await loadAndRenderGrid();
-            } catch (err) {
-                logToPage('Refresh error: ' + err.message);
-            }
+            await updateMyPresence();
+            await loadAndRenderGrid();
         };
 
-        // ---------- Auto-login ----------
+        // Auto-login on load
         (async () => {
             const savedKey = localStorage.getItem('torn_api_key');
             if (savedKey) {
