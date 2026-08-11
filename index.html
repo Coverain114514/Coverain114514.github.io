@@ -101,7 +101,7 @@
 
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const SLOTS = 48;
-        const ONLINE_THRESHOLD_SEC = 300; // 5 minutes
+        const ONLINE_THRESHOLD_SEC = 300;
 
         let currentUser = null;
         let pollInterval = null;
@@ -126,10 +126,10 @@
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API (with full debug info) ----------
+        // ---------- Torn API (explicitly request last_action) ----------
         async function verifyTornKey(key) {
             try {
-                const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
+                const res = await fetch(`https://api.torn.com/user/?selections=basic,last_action&key=${key}`);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error.error);
                 return { id: data.player_id, name: data.name };
@@ -141,17 +141,19 @@
 
         async function checkOnlineStatus(key) {
             try {
-                const res = await fetch(`https://api.torn.com/user/?selections=basic&key=${key}`);
+                // Force basic + last_action selection
+                const url = `https://api.torn.com/user/?selections=basic,last_action&key=${key}`;
+                const res = await fetch(url);
                 const data = await res.json();
                 if (data.error) return { online: false, lastAction: null, secondsAgo: null, rawData: null };
 
                 const lastAction = data.last_action;
-                const timestamp = lastAction?.timestamp;
-                if (!timestamp) {
+                if (!lastAction || !lastAction.timestamp) {
                     console.warn('[Torn] No last_action in response, full data:', data);
                     return { online: false, lastAction: null, secondsAgo: null, rawData: data };
                 }
 
+                const timestamp = lastAction.timestamp;
                 const nowSec = Math.floor(Date.now() / 1000);
                 const secondsAgo = nowSec - timestamp;
                 const online = secondsAgo < ONLINE_THRESHOLD_SEC;
@@ -214,11 +216,10 @@
 
             const status = await checkOnlineStatus(savedKey);
 
-            // Update UI with full debug info
-            const onlineStatusDiv = document.getElementById('onlineStatus');
+            // Update UI
+            document.getElementById('onlineStatus').style.display = 'block';
             const statusText = document.getElementById('statusText');
             const lastActionInfo = document.getElementById('lastActionInfo');
-            onlineStatusDiv.style.display = 'block';
 
             if (status.online) {
                 statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
@@ -228,18 +229,17 @@
 
             if (status.lastAction) {
                 const dateStr = new Date(status.lastAction * 1000).toLocaleString();
-                lastActionInfo.innerHTML = `Last action timestamp: ${status.lastAction} (${dateStr}) · ${status.secondsAgo}s ago`;
+                lastActionInfo.innerHTML = `Last action: ${status.lastAction} (${dateStr}) · ${status.secondsAgo}s ago`;
             } else {
-                lastActionInfo.innerHTML = 'No last_action data returned from API – check API key permissions or selections.';
+                lastActionInfo.innerHTML = '⚠ No last_action data – check API key permissions in Torn!';
             }
 
-            // Write presence if online
             if (status.online) {
                 const { date, slot } = getCurrentDateAndSlot();
                 await upsertPresence(currentUser.id, date, slot);
                 console.log(`✅ Marked online at slot ${slot}`);
             } else {
-                console.log(`⏸ Offline or no last_action data`);
+                console.log(`⏸ Offline or no timestamp available`);
             }
         }
 
