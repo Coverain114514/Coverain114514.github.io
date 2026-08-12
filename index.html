@@ -34,24 +34,26 @@
         }
         .user-badge strong { color: #f0c040; }
         .admin-panel {
-            text-align: center; margin-bottom: 15px;
-            display: none;
+            text-align: center; margin-bottom: 15px; display: none;
         }
         .admin-panel button {
-            padding: 10px 24px; background: #c0392b; border: 1px solid #e74c3c;
+            padding: 8px 18px; background: #c0392b; border: 1px solid #e74c3c;
             border-radius: 6px; color: white; cursor: pointer; font-weight: 600;
-            font-size: 1rem;
+            font-size: 0.9rem; margin: 3px;
         }
         .admin-panel button:hover { background: #e74c3c; }
+        .admin-panel input {
+            padding: 6px 10px; background: #0d1117; border: 1px solid #30363d;
+            border-radius: 4px; color: #f0f6fc; margin-right: 5px;
+        }
 
         .grid-container {
             overflow-x: auto; background: #161b22; border: 1px solid #30363d;
             border-radius: 8px; padding: 10px; margin-bottom: 15px;
         }
-        table { width: 100%; border-collapse: collapse; min-width: 1200px; table-layout: fixed; }
-        th, td { border: 1px solid #21262d; padding: 4px 2px; text-align: center; font-size: 0.68rem; vertical-align: middle; }
+        table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: fixed; }
+        th, td { border: 1px solid #21262d; padding: 8px 4px; text-align: center; font-size: 0.68rem; vertical-align: middle; }
         th { background: #21262d; color: #58a6ff; position: sticky; top: 0; z-index: 3; }
-        .time-header { font-size: 0.65rem; white-space: nowrap; }
 
         /* 有人的格子统一蓝色背景 */
         td.occupied {
@@ -103,15 +105,19 @@
         Signed in as <strong id="userNameDisplay"></strong> (ID: <strong id="userIdDisplay"></strong>)
     </div>
 
-    <!-- 管理员清除按钮，JS 控制显示 -->
+    <!-- 管理员面板：清除全部 + 定向清除用户名 -->
     <div id="adminPanel" class="admin-panel">
-        <button onclick="window.clearAllData()">⚠️ Clear All Availability Data</button>
+        <button onclick="window.clearAllData()">⚠️ Clear ALL Data</button>
+        <div style="margin-top:8px;">
+            <input type="text" id="clearUserInput" placeholder="Enter user name to clear all slots">
+            <button onclick="window.clearUserData()">🗑️ Clear User's All Slots</button>
+        </div>
     </div>
 
     <div class="legend">
-        <span class="legend-occupied">Occupied slot (blue background)</span>
-        <span class="legend-mine">My name (brown)</span>
-        <span class="legend-other">Other's name (blue)</span>
+        <span class="legend-occupied">Occupied slot</span>
+        <span class="legend-mine">My name</span>
+        <span class="legend-other">Other's name</span>
     </div>
 
     <div class="grid-container" id="gridContainer">
@@ -129,12 +135,10 @@
         const SUPABASE_URL = 'https://ohgvzzcojnjqzvyizyxs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M';
 
-        const DAYS = ['Today', 'Tomorrow', 'Day+2', 'Day+3', 'Day+4', 'Day+5', 'Day+6'];
-        const SLOTS = 48;
+        const SLOTS = 48; // 半小时段
         const ADMIN_ID = '3086281'; // Coverain114514
 
         let currentUser = null; // { id: string, name: string }
-        let availabilityData = [];
         let gridRefreshInterval = null;
 
         function logToDebug(msg) {
@@ -148,18 +152,12 @@
         }
 
         // ---------- Helpers ----------
-        function getFutureWeekDates() {
-            const dates = [];
+        function getTodayDate() {
             const now = new Date();
-            for (let i = 0; i < 7; i++) {
-                const d = new Date(now);
-                d.setUTCDate(now.getUTCDate() + i);
-                const year = d.getUTCFullYear();
-                const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-                const day = String(d.getUTCDate()).padStart(2, '0');
-                dates.push(`${year}-${month}-${day}`);
-            }
-            return dates;
+            const year = now.getUTCFullYear();
+            const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(now.getUTCDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
         function getSlotTime(slot) {
@@ -181,7 +179,6 @@
             try {
                 const data = await fetchBasic(key);
                 if (!data.player_id) throw new Error('Missing player_id');
-                // 转换为字符串，确保比较一致
                 return { id: String(data.player_id).trim(), name: data.name };
             } catch (err) {
                 logToDebug('[Torn] Verification failed: ' + err.message);
@@ -198,16 +195,15 @@
             };
         }
 
-        async function fetchAvailability(dates) {
-            const dateList = dates.map(d => `"${d}"`).join(',');
-            const url = `${SUPABASE_URL}/rest/v1/availability?date=in.(${encodeURIComponent(dateList)})&select=*`;
+        async function fetchAvailability(date) {
+            const url = `${SUPABASE_URL}/rest/v1/availability?date=eq.${encodeURIComponent(date)}&select=*`;
             const res = await fetch(url, { headers: supabaseHeaders() });
             if (!res.ok) {
                 logToDebug('Fetch failed: ' + res.status + ' ' + (await res.text()));
                 return [];
             }
             const data = await res.json();
-            logToDebug(`✅ Fetched ${data.length} availability records`);
+            logToDebug(`✅ Fetched ${data.length} records for today`);
             return data;
         }
 
@@ -222,16 +218,14 @@
             const existing = await res.json();
 
             if (existing.length > 0) {
-                // 删除自己的标记
                 const deleteUrl = `${SUPABASE_URL}/rest/v1/availability?id=eq.${existing[0].id}`;
                 res = await fetch(deleteUrl, { method: 'DELETE', headers: supabaseHeaders() });
                 if (res.ok) {
-                    logToDebug(`🗑️ Removed your availability at ${date} slot ${slot}`);
+                    logToDebug(`🗑️ Removed your availability at ${getSlotTime(slot)}`);
                 } else {
                     logToDebug('Delete failed: ' + (await res.json()).message);
                 }
             } else {
-                // 插入新标记
                 const insertUrl = `${SUPABASE_URL}/rest/v1/availability`;
                 res = await fetch(insertUrl, {
                     method: 'POST',
@@ -245,7 +239,7 @@
                     })
                 });
                 if (res.ok) {
-                    logToDebug(`✅ Marked yourself available at ${date} slot ${slot}`);
+                    logToDebug(`✅ Marked yourself available at ${getSlotTime(slot)}`);
                 } else {
                     logToDebug('Insert failed: ' + JSON.stringify(await res.json()));
                 }
@@ -267,56 +261,76 @@
                 promises.push(fetch(delUrl, { method: 'DELETE', headers: supabaseHeaders() }));
             }
             await Promise.all(promises);
-            logToDebug(`🗑️ Cleared ${records.length} availability records.`);
+            logToDebug(`🗑️ Cleared ALL ${records.length} records.`);
             await loadAndRenderGrid();
         }
 
-        // ---------- Render grid ----------
-        function renderGrid(dates, data) {
-            const cellMap = {};
+        async function clearUserData(userName) {
+            const url = `${SUPABASE_URL}/rest/v1/availability?user_name=eq.${encodeURIComponent(userName)}&select=id`;
+            const res = await fetch(url, { headers: supabaseHeaders() });
+            if (!res.ok) {
+                logToDebug('Fetch user records failed: ' + res.status);
+                return;
+            }
+            const records = await res.json();
+            const promises = [];
+            for (const rec of records) {
+                const delUrl = `${SUPABASE_URL}/rest/v1/availability?id=eq.${rec.id}`;
+                promises.push(fetch(delUrl, { method: 'DELETE', headers: supabaseHeaders() }));
+            }
+            await Promise.all(promises);
+            logToDebug(`🗑️ Cleared ${records.length} slots for user "${userName}".`);
+            await loadAndRenderGrid();
+        }
+
+        // ---------- 渲染单行时间表 ----------
+        function renderGrid(date, data) {
+            // 按 slot 汇总，每个 slot 存储 { userId, userName } 列表
+            const slotMap = {};
+            for (let s = 0; s < SLOTS; s++) {
+                slotMap[s] = [];
+            }
             data.forEach(row => {
-                const key = `${row.date}_${row.slot}`;
-                if (!cellMap[key]) cellMap[key] = [];
-                const uid = String(row.user_id).trim();
-                cellMap[key].push({ userId: uid, userName: row.user_name || `ID:${row.user_id}` });
+                const slot = row.slot;
+                if (slot >= 0 && slot < SLOTS) {
+                    slotMap[slot].push({
+                        userId: String(row.user_id).trim(),
+                        userName: row.user_name || `ID:${row.user_id}`
+                    });
+                }
             });
 
-            let html = '<table><thead><tr><th>Time (UTC)</th>';
-            dates.forEach((date, i) => {
-                html += `<th>${DAYS[i]}<br>${date.slice(5)}</th>`;
-            });
-            html += '</tr></thead><tbody>';
+            // 构建表格：第一行为表头（时间），第二行为格子
+            let html = '<table><thead><tr><th style="width:80px;">Time</th>';
+            for (let s = 0; s < SLOTS; s++) {
+                html += `<th>${getSlotTime(s)}</th>`;
+            }
+            html += '</tr></thead><tbody><tr>';
+            html += '<td style="font-weight:bold;">Today</td>';
 
             for (let s = 0; s < SLOTS; s++) {
-                html += '<tr>';
-                html += `<td class="time-header">${getSlotTime(s)}</td>`;
-                dates.forEach(date => {
-                    const key = `${date}_${s}`;
-                    const entries = cellMap[key] || [];
-                    let cls = 'empty-slot';
-                    let content = '';
-                    if (entries.length > 0) {
-                        cls = 'occupied'; // 统一蓝色背景
-                        content = entries.map(e => {
-                            const isMine = (e.userId === currentUser.id);
-                            const nameClass = isMine ? 'my-name' : 'other-name';
-                            return `<span class="${nameClass}">${e.userName}</span>`;
-                        }).join('<br>');
-                    }
-                    html += `<td class="${cls}" data-date="${date}" data-slot="${s}">${content}</td>`;
-                });
-                html += '</tr>';
+                const entries = slotMap[s];
+                let cls = 'empty-slot';
+                let content = '';
+                if (entries.length > 0) {
+                    cls = 'occupied';
+                    content = entries.map(e => {
+                        const isMine = (e.userId === currentUser.id);
+                        const nameClass = isMine ? 'my-name' : 'other-name';
+                        return `<span class="${nameClass}">${e.userName}</span>`;
+                    }).join('<br>');
+                }
+                html += `<td class="${cls}" data-slot="${s}">${content}</td>`;
             }
-            html += '</tbody></table>';
+            html += '</tr></tbody></table>';
 
             const gridContainer = document.getElementById('gridContainer');
             gridContainer.innerHTML = html;
 
-            // 绑定点击事件
+            // 绑定点击事件：所有格子都可点击（切换自己的标记）
             if (currentUser) {
-                gridContainer.querySelectorAll('td[data-date]').forEach(td => {
+                gridContainer.querySelectorAll('td[data-slot]').forEach(td => {
                     td.addEventListener('click', async () => {
-                        const date = td.dataset.date;
                         const slot = parseInt(td.dataset.slot);
                         await toggleAvailability(currentUser.id, currentUser.name, date, slot);
                     });
@@ -326,9 +340,9 @@
 
         async function loadAndRenderGrid() {
             if (!currentUser) return;
-            const dates = getFutureWeekDates();
-            availabilityData = await fetchAvailability(dates);
-            renderGrid(dates, availabilityData);
+            const today = getTodayDate();
+            const data = await fetchAvailability(today);
+            renderGrid(today, data);
         }
 
         // ---------- Login ----------
@@ -350,11 +364,11 @@
             document.getElementById('userNameDisplay').textContent = user.name;
             document.getElementById('userIdDisplay').textContent = user.id;
 
-            // 显示管理员清除按钮
+            // 显示管理员面板
             const adminPanel = document.getElementById('adminPanel');
             if (user.id === ADMIN_ID) {
                 adminPanel.style.display = 'block';
-                logToDebug('✅ Admin clear button shown');
+                logToDebug('✅ Admin panel shown');
             } else {
                 adminPanel.style.display = 'none';
             }
@@ -369,11 +383,23 @@
 
         window.clearAllData = async function() {
             if (!currentUser || currentUser.id !== ADMIN_ID) {
-                alert('Only Coverain114514 can clear data.');
+                alert('Only Coverain114514 can clear all data.');
                 return;
             }
             if (confirm('Are you sure you want to delete ALL availability data?')) {
                 await clearAllAvailability();
+            }
+        };
+
+        window.clearUserData = async function() {
+            if (!currentUser || currentUser.id !== ADMIN_ID) {
+                alert('Only Coverain114514 can clear user data.');
+                return;
+            }
+            const name = document.getElementById('clearUserInput').value.trim();
+            if (!name) return alert('Please enter a user name');
+            if (confirm(`Clear ALL availability for user "${name}"?`)) {
+                await clearUserData(name);
             }
         };
 
