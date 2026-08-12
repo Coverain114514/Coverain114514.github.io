@@ -155,21 +155,17 @@
             return { date: dateStr, slot };
         }
 
-        // ---------- Torn API v2 ----------
+        // ---------- Torn API v2 (no selections) ----------
         async function fetchFactionData(key) {
-            // First attempt: v2 with selections (may fail)
-            let url = `https://api.torn.com/v2/faction?selections=basic,members&key=${key}`;
-            let res = await fetch(url);
-            let json = await res.json();
-            if (json.error) {
-                // If error, try without selections (default might include members)
-                logToDebug('v2 with selections failed, trying default...');
-                url = `https://api.torn.com/v2/faction?key=${key}`;
-                res = await fetch(url);
-                json = await res.json();
-                if (json.error) throw new Error(json.error.error || json.error);
+            const url = `https://api.torn.com/v2/faction?key=${key}`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error?.message || `HTTP ${res.status}`);
             }
-            // v2 may wrap response in data
+            const json = await res.json();
+            if (json.error) throw new Error(json.error.message || json.error);
+            // v2 may wrap response in "data" or return flat
             return json.data || json;
         }
 
@@ -219,11 +215,11 @@
         async function updateFactionPresence() {
             if (!currentKey) return;
             clearDebug();
-            logToDebug('🔄 Fetching faction data (v2)...');
+            logToDebug('🔄 Fetching faction data (v2 no selections)...');
             try {
                 const faction = await fetchFactionData(currentKey);
                 const members = faction.members;
-                if (!members) throw new Error('No members data');
+                if (!members) throw new Error('No members data in response');
 
                 const nowSec = Math.floor(Date.now() / 1000);
                 const { date: today, slot: currentSlot } = getCurrentDateAndSlot();
