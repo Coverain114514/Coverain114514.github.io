@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Disabled_Hijackers's members Online Schedule</title>
+    <title>Disabled_Hijackers's Availability Planner</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -18,7 +18,7 @@
         }
         .login-panel {
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-            padding: 16px; max-width: 620px; margin: 0 auto 20px;
+            padding: 16px; max-width: 600px; margin: 0 auto 20px;
             display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;
         }
         .login-panel input {
@@ -33,46 +33,52 @@
             text-align: center; margin-bottom: 8px; font-size: 0.9rem; color: #8b949e;
         }
         .user-badge strong { color: #f0c040; }
-        .status-indicator {
-            text-align: center; margin-bottom: 8px; font-size: 0.95rem;
+        .admin-panel {
+            text-align: center; margin-bottom: 15px; display: none;
         }
-        .status-online { color: #3fb950; font-weight: bold; }
-        .status-offline { color: #f85149; font-weight: bold; }
+        .admin-panel button {
+            padding: 8px 20px; background: #c0392b; border: 1px solid #e74c3c;
+            border-radius: 6px; color: white; cursor: pointer; font-weight: 600;
+        }
+        .admin-panel button:hover { background: #e74c3c; }
+        .grid-container {
+            overflow-x: auto; background: #161b22; border: 1px solid #30363d;
+            border-radius: 8px; padding: 10px; margin-bottom: 15px;
+        }
+        table { width: 100%; border-collapse: collapse; min-width: 1200px; table-layout: fixed; }
+        th, td { border: 1px solid #21262d; padding: 4px 2px; text-align: center; font-size: 0.68rem; vertical-align: middle; }
+        th { background: #21262d; color: #58a6ff; position: sticky; top: 0; z-index: 3; }
+        .time-header { font-size: 0.65rem; white-space: nowrap; }
+        td.available {
+            background: rgba(46, 204, 113, 0.18);
+            color: #2ecc71;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        td.mine {
+            background: rgba(241, 196, 15, 0.2);
+            color: #f1c40f;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        td.empty-slot { color: #484f58; cursor: pointer; }
+        td.empty-slot:hover { background: #1e2a3a; }
+        .legend { display: flex; justify-content: center; gap: 18px; margin: 10px 0; font-size: 0.8rem; }
+        .legend span::before { content: '■'; margin-right: 5px; }
+        .legend .legend-available::before { color: rgba(46, 204, 113, 0.18); }
+        .legend .legend-mine::before { color: rgba(241, 196, 15, 0.2); }
+        .refresh-note { text-align: center; font-size: 0.75rem; color: #484f58; margin-top: 10px; }
         .debug-box {
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
             padding: 12px; margin: 10px auto 20px; max-width: 700px;
             font-family: monospace; font-size: 0.75rem; color: #8b949e;
             white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto;
         }
-        .grid-container {
-            overflow-x: auto; background: #161b22; border: 1px solid #30363d;
-            border-radius: 8px; padding: 10px;
-        }
-        table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: fixed; }
-        th, td { border: 1px solid #21262d; padding: 6px 4px; text-align: center; font-size: 0.7rem; vertical-align: middle; }
-        th { background: #21262d; color: #58a6ff; position: sticky; top: 0; z-index: 3; }
-        .time-header { font-size: 0.7rem; white-space: nowrap; }
-        td.marked {
-            background: rgba(88, 166, 255, 0.2);
-            color: #c9d1d9;
-            font-weight: normal;
-            font-size: 0.68rem;
-            line-height: 1.3;
-        }
-        td.empty-slot { color: #484f58; }
-        .legend { display: flex; justify-content: center; gap: 18px; margin: 10px 0 15px; font-size: 0.8rem; }
-        .legend span::before { content: '■'; margin-right: 5px; color: rgba(88, 166, 255, 0.2); }
-        .refresh-note { text-align: center; font-size: 0.75rem; color: #484f58; margin-top: 10px; }
-        .manual-refresh {
-            display: block; margin: 0 auto 10px; padding: 6px 16px;
-            background: #30363d; border: 1px solid #58a6ff; color: #58a6ff;
-            border-radius: 4px; cursor: pointer;
-        }
     </style>
 </head>
 <body>
-    <h1>Disabled_Hijackers's members Online Schedule</h1>
-    <div class="utc-note">All times are in UTC+0</div>
+    <h1>Disabled_Hijackers's Availability Planner</h1>
+    <div class="utc-note">All times are in UTC+0 · Click a slot to toggle your availability</div>
 
     <div class="login-panel">
         <input type="text" id="apiKeyInput" placeholder="Paste your Torn API key">
@@ -83,34 +89,36 @@
         Signed in as <strong id="userNameDisplay"></strong> (ID: <strong id="userIdDisplay"></strong>)
     </div>
 
-    <div id="onlineStatus" class="status-indicator" style="display:none;">
-        Current Torn status: <span id="statusText"></span>
+    <div id="adminPanel" class="admin-panel">
+        <button onclick="window.clearAllData()">⚠️ Clear All Availability Data</button>
     </div>
 
-    <button id="manualRefreshBtn" class="manual-refresh" onclick="window.handleManualRefresh()">🔄 Refresh Grid Now</button>
-
-    <div class="legend"><span>Member online (this week)</span></div>
+    <div class="legend">
+        <span class="legend-available">Others available</span>
+        <span class="legend-mine">My availability</span>
+    </div>
 
     <div class="grid-container" id="gridContainer">
-        <p style="text-align:center;padding:30px;color:#8b949e;">Sign in to see the schedule.</p>
+        <p style="text-align:center;padding:30px;color:#8b949e;">Sign in to view and select your available times.</p>
     </div>
 
     <div class="debug-box" id="debugBox">
         <strong>🔍 Status</strong><br>
         (Waiting for action...)
     </div>
-    <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
+    <div class="refresh-note">Data auto‑refreshes every 60 seconds</div>
 
     <script>
         // ========== SUPABASE CONFIG ==========
         const SUPABASE_URL = 'https://ohgvzzcojnjqzvyizyxs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M';
 
-        const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const SLOTS = 48;
+        const DAYS = ['Today', 'Tomorrow', 'Day+2', 'Day+3', 'Day+4', 'Day+5', 'Day+6'];
+        const SLOTS = 48; // half-hour slots
+        const ADMIN_ID = '3086281'; // Coverain114514
 
-        let currentUser = null;
-        let pollInterval = null;
+        let currentUser = null; // { id, name }
+        let availabilityData = [];
         let gridRefreshInterval = null;
 
         function logToDebug(msg) {
@@ -124,34 +132,25 @@
         }
 
         // ---------- Helpers ----------
-        function getCurrentWeekDates() {
+        function getFutureWeekDates() {
+            // Returns array of 7 dates starting from today (UTC)
+            const dates = [];
             const now = new Date();
-            const day = now.getDay();
-            const monday = new Date(now);
-            monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-            return Array.from({length: 7}, (_, i) => {
-                const d = new Date(monday);
-                d.setDate(monday.getDate() + i);
-                return d.toISOString().slice(0,10);
-            });
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(now);
+                d.setUTCDate(now.getUTCDate() + i);
+                const year = d.getUTCFullYear();
+                const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(d.getUTCDate()).padStart(2, '0');
+                dates.push(`${year}-${month}-${day}`);
+            }
+            return dates;
         }
 
         function getSlotTime(slot) {
             const h = String(Math.floor(slot / 2)).padStart(2, '0');
             const m = slot % 2 === 0 ? '00' : '30';
             return `${h}:${m}`;
-        }
-
-        function getCurrentDateAndSlot() {
-            const now = new Date();
-            const year = now.getUTCFullYear();
-            const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(now.getUTCDate()).padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`;
-            const hours = now.getUTCHours();
-            const minutes = now.getUTCMinutes();
-            const slot = hours * 2 + (minutes >= 30 ? 1 : 0);
-            return { date: dateStr, slot };
         }
 
         // ---------- Torn API ----------
@@ -163,14 +162,14 @@
             return json;
         }
 
-        async function verifyAndCheckOnline(key) {
+        async function verifyTornKey(key) {
             try {
                 const data = await fetchBasic(key);
                 if (!data.player_id) throw new Error('Missing player_id');
-                return { user: { id: data.player_id, name: data.name }, online: true };
+                return { id: data.player_id, name: data.name };
             } catch (err) {
-                logToDebug('[Torn] Request failed: ' + err.message);
-                return { user: null, online: false };
+                logToDebug('[Torn] Verification failed: ' + err.message);
+                return null;
             }
         }
 
@@ -183,14 +182,41 @@
             };
         }
 
-        async function upsertPresence(userId, userName, date, slot) {
-            const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
+        async function fetchAvailability(dates) {
+            const dateList = dates.map(d => `"${d}"`).join(',');
+            const url = `${SUPABASE_URL}/rest/v1/availability?date=in.(${encodeURIComponent(dateList)})&select=*`;
+            const res = await fetch(url, { headers: supabaseHeaders() });
+            if (!res.ok) {
+                logToDebug('Fetch failed: ' + res.status + ' ' + (await res.text()));
+                return [];
+            }
+            const data = await res.json();
+            logToDebug(`✅ Fetched ${data.length} availability records`);
+            return data;
+        }
+
+        async function toggleAvailability(userId, userName, date, slot) {
+            // Check if already marked
+            const checkUrl = `${SUPABASE_URL}/rest/v1/availability?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
-            if (!res.ok) { logToDebug('[Supabase] Check failed: ' + res.status); return; }
+            if (!res.ok) {
+                logToDebug('Toggle check failed: ' + res.status);
+                return;
+            }
             const existing = await res.json();
 
-            if (existing.length === 0) {
-                const insertUrl = `${SUPABASE_URL}/rest/v1/presence`;
+            if (existing.length > 0) {
+                // Delete own mark
+                const deleteUrl = `${SUPABASE_URL}/rest/v1/availability?id=eq.${existing[0].id}`;
+                res = await fetch(deleteUrl, { method: 'DELETE', headers: supabaseHeaders() });
+                if (res.ok) {
+                    logToDebug(`🗑️ Removed your availability at ${date} slot ${slot}`);
+                } else {
+                    logToDebug('Delete failed: ' + (await res.json()).message);
+                }
+            } else {
+                // Insert new mark
+                const insertUrl = `${SUPABASE_URL}/rest/v1/availability`;
                 res = await fetch(insertUrl, {
                     method: 'POST',
                     headers: supabaseHeaders(),
@@ -202,89 +228,41 @@
                         timestamp: Date.now()
                     })
                 });
-                if (res.ok) logToDebug('✅ Marked slot ' + slot);
-                else logToDebug('❌ Insert failed: ' + JSON.stringify(await res.json()));
-            } else {
-                const updateUrl = `${SUPABASE_URL}/rest/v1/presence?id=eq.${existing[0].id}`;
-                res = await fetch(updateUrl, {
-                    method: 'PATCH',
-                    headers: supabaseHeaders(),
-                    body: JSON.stringify({ timestamp: Date.now(), user_name: userName })
-                });
-                if (res.ok) logToDebug('🔄 Updated slot ' + slot);
-                else logToDebug('❌ Update failed: ' + JSON.stringify(await res.json()));
-            }
-        }
-
-        async function fetchPresence(dates) {
-            const dateList = dates.map(d => `"${d}"`).join(',');
-            const url = `${SUPABASE_URL}/rest/v1/presence?date=in.(${encodeURIComponent(dateList)})&select=*`;
-            const res = await fetch(url, { headers: supabaseHeaders() });
-            if (!res.ok) { logToDebug('Fetch failed: ' + res.status); return []; }
-            return await res.json();
-        }
-
-        async function patchMissingName(recordId, userName) {
-            const url = `${SUPABASE_URL}/rest/v1/presence?id=eq.${recordId}`;
-            const res = await fetch(url, {
-                method: 'PATCH',
-                headers: supabaseHeaders(),
-                body: JSON.stringify({ user_name: userName })
-            });
-            if (res.ok) logToDebug('🔧 Patched missing name for record ' + recordId);
-            else logToDebug('Patch failed: ' + (await res.json()).message);
-        }
-
-        // ---------- Update presence ----------
-        async function updateMyPresence() {
-            if (!currentUser) return;
-            const savedKey = localStorage.getItem('torn_api_key');
-            if (!savedKey) return;
-
-            clearDebug();
-            logToDebug('Checking API connection...');
-            const { user, online } = await verifyAndCheckOnline(savedKey);
-
-            document.getElementById('onlineStatus').style.display = 'block';
-            const statusText = document.getElementById('statusText');
-
-            if (online && user) {
-                statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
-                logToDebug(`✅ Online as ${user.name}`);
-                const { date, slot } = getCurrentDateAndSlot();
-                await upsertPresence(currentUser.id, currentUser.name, date, slot);
-            } else {
-                statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
-                logToDebug('❌ Offline or API error');
-            }
-        }
-
-        // ---------- Grid rendering (NO TIME) ----------
-        async function loadAndRenderGrid() {
-            logToDebug('📊 Loading grid...');
-            const dates = getCurrentWeekDates();
-            const data = await fetchPresence(dates);
-
-            // Name map
-            const nameMap = {};
-            data.forEach(row => {
-                if (row.user_name && row.user_id) nameMap[row.user_id] = row.user_name;
-            });
-
-            // Patch missing names
-            data.forEach(row => {
-                if (!row.user_name && row.user_id && nameMap[row.user_id]) {
-                    patchMissingName(row.id, nameMap[row.user_id]);
+                if (res.ok) {
+                    logToDebug(`✅ Marked yourself available at ${date} slot ${slot}`);
+                } else {
+                    logToDebug('Insert failed: ' + JSON.stringify(await res.json()));
                 }
-            });
+            }
+            await loadAndRenderGrid();
+        }
 
-            // Cell map
+        async function clearAllAvailability() {
+            const url = `${SUPABASE_URL}/rest/v1/availability?select=id`;
+            const res = await fetch(url, { headers: supabaseHeaders() });
+            if (!res.ok) {
+                logToDebug('Fetch for clear failed: ' + res.status);
+                return;
+            }
+            const records = await res.json();
+            const promises = [];
+            for (const rec of records) {
+                const delUrl = `${SUPABASE_URL}/rest/v1/availability?id=eq.${rec.id}`;
+                promises.push(fetch(delUrl, { method: 'DELETE', headers: supabaseHeaders() }));
+            }
+            await Promise.all(promises);
+            logToDebug(`🗑️ Cleared ${records.length} availability records.`);
+            await loadAndRenderGrid();
+        }
+
+        // ---------- Render grid ----------
+        function renderGrid(dates, data) {
+            // Build cell map: { `${date}_${slot}`: [ {userId, userName} ] }
             const cellMap = {};
             data.forEach(row => {
                 const key = `${row.date}_${row.slot}`;
-                if (!cellMap[key]) cellMap[key] = new Set();
-                const displayName = row.user_name || nameMap[row.user_id] || `ID:${row.user_id}`;
-                cellMap[key].add(displayName);
+                if (!cellMap[key]) cellMap[key] = [];
+                cellMap[key].push({ userId: row.user_id, userName: row.user_name || `ID:${row.user_id}` });
             });
 
             let html = '<table><thead><tr><th>Time (UTC)</th>';
@@ -298,18 +276,40 @@
                 html += `<td class="time-header">${getSlotTime(s)}</td>`;
                 dates.forEach(date => {
                     const key = `${date}_${s}`;
-                    const names = cellMap[key] ? Array.from(cellMap[key]) : [];
-                    if (names.length > 0) {
-                        html += `<td class="marked">${names.join('<br>')}</td>`;
-                    } else {
-                        html += `<td class="empty-slot"></td>`;
+                    const entries = cellMap[key] || [];
+                    let cls = 'empty-slot';
+                    let content = '';
+                    if (entries.length > 0) {
+                        const myEntry = entries.find(e => e.userId === currentUser?.id);
+                        if (myEntry) cls = 'mine'; else cls = 'available';
+                        content = entries.map(e => e.userName).join('<br>');
                     }
+                    html += `<td class="${cls}" data-date="${date}" data-slot="${s}">${content}</td>`;
                 });
                 html += '</tr>';
             }
             html += '</tbody></table>';
-            document.getElementById('gridContainer').innerHTML = html;
-            logToDebug('Grid ready.');
+
+            const gridContainer = document.getElementById('gridContainer');
+            gridContainer.innerHTML = html;
+
+            // Attach click handlers
+            if (currentUser) {
+                gridContainer.querySelectorAll('td[data-date]').forEach(td => {
+                    td.addEventListener('click', async () => {
+                        const date = td.dataset.date;
+                        const slot = parseInt(td.dataset.slot);
+                        await toggleAvailability(currentUser.id, currentUser.name, date, slot);
+                    });
+                });
+            }
+        }
+
+        async function loadAndRenderGrid() {
+            if (!currentUser) return;
+            const dates = getFutureWeekDates();
+            availabilityData = await fetchAvailability(dates);
+            renderGrid(dates, availabilityData);
         }
 
         // ---------- Login ----------
@@ -318,10 +318,10 @@
             if (!key) return alert('Please enter your Torn API key');
 
             clearDebug();
-            logToDebug('Verifying...');
-            const { user, online } = await verifyAndCheckOnline(key);
+            logToDebug('Verifying API key...');
+            const user = await verifyTornKey(key);
             if (!user) {
-                alert('Invalid API key or Torn unreachable.');
+                alert('Invalid API key. Check debug log for details.');
                 return;
             }
 
@@ -330,29 +330,34 @@
             document.getElementById('userBadge').style.display = 'block';
             document.getElementById('userNameDisplay').textContent = user.name;
             document.getElementById('userIdDisplay').textContent = user.id;
+
+            // Show admin clear button if current user is admin
+            const adminPanel = document.getElementById('adminPanel');
+            if (user.id === ADMIN_ID) {
+                adminPanel.style.display = 'block';
+            } else {
+                adminPanel.style.display = 'none';
+            }
+
             document.getElementById('loginBtn').textContent = '🔄 Signed in';
-            logToDebug(`✅ Logged in as ${user.name}`);
+            logToDebug(`✅ Logged in as ${user.name} (ID: ${user.id})`);
 
-            if (pollInterval) clearInterval(pollInterval);
             if (gridRefreshInterval) clearInterval(gridRefreshInterval);
-
-            await updateMyPresence();
             await loadAndRenderGrid();
-
-            pollInterval = setInterval(updateMyPresence, 30000);
-            gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
+            gridRefreshInterval = setInterval(loadAndRenderGrid, 60000);
         };
 
-        window.handleManualRefresh = async function() {
-            if (!currentUser) {
-                alert('Please sign in first.');
+        window.clearAllData = async function() {
+            if (!currentUser || currentUser.id !== ADMIN_ID) {
+                alert('Only Coverain114514 can clear data.');
                 return;
             }
-            await updateMyPresence();
-            await loadAndRenderGrid();
+            if (confirm('Are you sure you want to delete ALL availability data?')) {
+                await clearAllAvailability();
+            }
         };
 
-        // Auto-login
+        // Auto-login if key saved
         (async () => {
             const savedKey = localStorage.getItem('torn_api_key');
             if (savedKey) {
