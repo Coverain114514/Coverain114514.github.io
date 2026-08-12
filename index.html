@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Torn Weekly Online Schedule</title>
+    <title>Disabled_Hijackers's members Online Schedule</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -12,7 +12,10 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             padding: 20px;
         }
-        h1 { text-align: center; color: #58a6ff; margin-bottom: 12px; }
+        h1 { text-align: center; color: #58a6ff; margin-bottom: 8px; }
+        .utc-note {
+            text-align: center; color: #8b949e; font-size: 0.85rem; margin-bottom: 15px;
+        }
         .login-panel {
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
             padding: 16px; max-width: 620px; margin: 0 auto 20px;
@@ -39,28 +42,26 @@
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
             padding: 12px; margin: 10px auto 20px; max-width: 700px;
             font-family: monospace; font-size: 0.75rem; color: #8b949e;
-            white-space: pre-wrap; word-break: break-all; max-height: 250px; overflow-y: auto;
+            white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto;
         }
         .grid-container {
             overflow-x: auto; background: #161b22; border: 1px solid #30363d;
             border-radius: 8px; padding: 10px;
         }
-        table { width: 100%; border-collapse: collapse; min-width: 900px; table-layout: fixed; }
-        th, td { border: 1px solid #21262d; padding: 4px 2px; text-align: center; font-size: 0.7rem; height: 28px; }
+        table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: fixed; }
+        th, td { border: 1px solid #21262d; padding: 6px 4px; text-align: center; font-size: 0.7rem; vertical-align: middle; }
         th { background: #21262d; color: #58a6ff; position: sticky; top: 0; z-index: 3; }
-        .time-header { font-size: 0.65rem; white-space: nowrap; }
+        .time-header { font-size: 0.7rem; white-space: nowrap; }
         td.marked {
-            background: rgba(88, 166, 255, 0.15);
-            color: #58a6ff;
-            font-weight: bold;
+            background: rgba(88, 166, 255, 0.2);
+            color: #c9d1d9;
+            font-weight: normal;
+            font-size: 0.68rem;
+            line-height: 1.3;
         }
-        td.marked::after {
-            content: attr(data-count);
-            font-size: 0.65rem;
-            margin-left: 2px;
-        }
+        td.empty-slot { color: #484f58; }
         .legend { display: flex; justify-content: center; gap: 18px; margin: 10px 0 15px; font-size: 0.8rem; }
-        .legend span::before { content: '■'; margin-right: 5px; color: rgba(88, 166, 255, 0.15); }
+        .legend span::before { content: '■'; margin-right: 5px; color: rgba(88, 166, 255, 0.2); }
         .refresh-note { text-align: center; font-size: 0.75rem; color: #484f58; margin-top: 10px; }
         .manual-refresh {
             display: block; margin: 0 auto 10px; padding: 6px 16px;
@@ -70,7 +71,8 @@
     </style>
 </head>
 <body>
-    <h1>📅 Torn Weekly Online Schedule</h1>
+    <h1>Disabled_Hijackers's members Online Schedule</h1>
+    <div class="utc-note">All times are in UTC+0</div>
 
     <div class="login-panel">
         <input type="text" id="apiKeyInput" placeholder="Paste your Torn API key">
@@ -87,15 +89,15 @@
 
     <button id="manualRefreshBtn" class="manual-refresh" onclick="window.handleManualRefresh()">🔄 Refresh Grid Now</button>
 
-    <div class="legend"><span>Marked online this week</span></div>
+    <div class="legend"><span>Member online (this week)</span></div>
 
     <div class="grid-container" id="gridContainer">
         <p style="text-align:center;padding:30px;color:#8b949e;">Sign in to see the schedule.</p>
     </div>
 
     <div class="debug-box" id="debugBox">
-        <strong>🔍 Detailed Log</strong><br>
-        (Click Refresh Grid Now to see activity)
+        <strong>🔍 Status</strong><br>
+        (Waiting for action...)
     </div>
     <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
 
@@ -118,7 +120,7 @@
         }
 
         function clearDebug() {
-            document.getElementById('debugBox').innerHTML = '<strong>🔍 Detailed Log</strong><br>(Click Refresh Grid Now to see activity)';
+            document.getElementById('debugBox').innerHTML = '<strong>🔍 Status</strong><br>(Waiting for action...)';
         }
 
         // ---------- Helpers ----------
@@ -140,16 +142,20 @@
             return `${h}:${m}`;
         }
 
+        // Use UTC for storage, display as UTC
         function getCurrentDateAndSlot() {
             const now = new Date();
-            const dateStr = now.toISOString().slice(0,10);
+            const year = now.getUTCFullYear();
+            const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(now.getUTCDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
             const hours = now.getUTCHours();
             const minutes = now.getUTCMinutes();
             const slot = hours * 2 + (minutes >= 30 ? 1 : 0);
             return { date: dateStr, slot };
         }
 
-        // ---------- Torn API ----------
+        // Torn API
         async function fetchBasic(key) {
             const url = `https://api.torn.com/user/?selections=basic&key=${key}`;
             const res = await fetch(url);
@@ -162,17 +168,14 @@
             try {
                 const data = await fetchBasic(key);
                 if (!data.player_id) throw new Error('Missing player_id');
-                return { 
-                    user: { id: data.player_id, name: data.name },
-                    online: true 
-                };
+                return { user: { id: data.player_id, name: data.name }, online: true };
             } catch (err) {
                 logToDebug('[Torn] Request failed: ' + err.message);
                 return { user: null, online: false };
             }
         }
 
-        // ---------- Supabase REST ----------
+        // Supabase REST
         function supabaseHeaders() {
             return {
                 'apikey': SUPABASE_ANON_KEY,
@@ -182,52 +185,34 @@
         }
 
         async function upsertPresence(userId, date, slot) {
-            logToDebug(`🔄 Checking presence for user ${userId} on ${date} slot ${slot}...`);
             const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
-            logToDebug('[Supabase] Check URL: ' + checkUrl);
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
-            if (!res.ok) {
-                logToDebug('[Supabase] Check failed (status ' + res.status + '): ' + (await res.text()));
-                return;
-            }
+            if (!res.ok) { logToDebug('[Supabase] Check failed: ' + res.status); return; }
             const existing = await res.json();
-            logToDebug('[Supabase] Existing entries: ' + JSON.stringify(existing));
 
             if (existing.length === 0) {
                 const insertUrl = `${SUPABASE_URL}/rest/v1/presence`;
-                logToDebug('[Supabase] Inserting...');
                 res = await fetch(insertUrl, {
                     method: 'POST',
                     headers: supabaseHeaders(),
                     body: JSON.stringify({ user_id: userId, date, slot, timestamp: Date.now() })
                 });
-                if (res.ok) {
-                    logToDebug('✅ Marked slot ' + slot);
-                } else {
-                    const err = await res.json();
-                    logToDebug('❌ Insert failed: ' + JSON.stringify(err));
-                }
+                if (res.ok) logToDebug('✅ Marked slot ' + slot);
+                else logToDebug('❌ Insert failed: ' + JSON.stringify(await res.json()));
             } else {
-                logToDebug('ℹ️ Already marked, skipping insert.');
+                logToDebug('ℹ️ Already marked at slot ' + slot);
             }
         }
 
         async function fetchPresence(dates) {
             const dateList = dates.map(d => `"${d}"`).join(',');
             const url = `${SUPABASE_URL}/rest/v1/presence?date=in.(${encodeURIComponent(dateList)})&select=*`;
-            logToDebug('[Supabase] Fetch URL: ' + url);
             const res = await fetch(url, { headers: supabaseHeaders() });
-            if (!res.ok) {
-                const errText = await res.text();
-                logToDebug('❌ Fetch failed (status ' + res.status + '): ' + errText);
-                return [];
-            }
-            const data = await res.json();
-            logToDebug(`✅ Fetched ${data.length} presence records`);
-            return data;
+            if (!res.ok) { logToDebug('Fetch failed: ' + res.status); return []; }
+            return await res.json();
         }
 
-        // ---------- Core update ----------
+        // Update my presence
         async function updateMyPresence() {
             if (!currentUser) return;
             const savedKey = localStorage.getItem('torn_api_key');
@@ -242,32 +227,30 @@
 
             if (online && user) {
                 statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
-                logToDebug(`✅ Connection OK – logged in as ${user.name}`);
+                logToDebug(`✅ Online as ${user.name}`);
                 const { date, slot } = getCurrentDateAndSlot();
                 await upsertPresence(currentUser.id, date, slot);
             } else {
                 statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
-                logToDebug('❌ API unreachable or invalid key');
+                logToDebug('❌ Offline or API error');
             }
         }
 
-        // ---------- Grid rendering ----------
+        // Render grid with user IDs and times
         async function loadAndRenderGrid() {
-            logToDebug('📊 Loading schedule...');
+            logToDebug('📊 Loading grid...');
             const dates = getCurrentWeekDates();
             const data = await fetchPresence(dates);
 
+            // Build cellMap: { `${date}_${slot}`: [ { user_id, timestamp } ] }
             const cellMap = {};
             data.forEach(row => {
                 const key = `${row.date}_${row.slot}`;
-                if (!cellMap[key]) cellMap[key] = new Set();
-                cellMap[key].add(row.user_id);
+                if (!cellMap[key]) cellMap[key] = [];
+                cellMap[key].push({ userId: row.user_id, timestamp: row.timestamp });
             });
 
-            let totalMarks = 0;
-            for (const key in cellMap) totalMarks += cellMap[key].size;
-
-            let html = '<table><thead><tr><th>Time</th>';
+            let html = '<table><thead><tr><th>Time (UTC)</th>';
             dates.forEach((date, i) => {
                 html += `<th>${DAYS[i]}<br>${date.slice(5)}</th>`;
             });
@@ -278,26 +261,36 @@
                 html += `<td class="time-header">${getSlotTime(s)}</td>`;
                 dates.forEach(date => {
                     const key = `${date}_${s}`;
-                    const users = cellMap[key]?.size || 0;
-                    html += `<td class="${users > 0 ? 'marked' : ''}" data-count="${users > 1 ? users : ''}"></td>`;
+                    const entries = cellMap[key] || [];
+                    if (entries.length > 0) {
+                        const content = entries.map(e => {
+                            const time = new Date(e.timestamp);
+                            const hh = String(time.getUTCHours()).padStart(2, '0');
+                            const mm = String(time.getUTCMinutes()).padStart(2, '0');
+                            return `ID:${e.userId}<br>${hh}:${mm}`;
+                        }).join('<br>');
+                        html += `<td class="marked">${content}</td>`;
+                    } else {
+                        html += `<td class="empty-slot"></td>`;
+                    }
                 });
                 html += '</tr>';
             }
             html += '</tbody></table>';
             document.getElementById('gridContainer').innerHTML = html;
-            logToDebug(`📌 Grid rendered with ${totalMarks} marked slots.`);
+            logToDebug('Grid ready.');
         }
 
-        // ---------- Login ----------
+        // Login
         window.handleLogin = async function() {
             const key = document.getElementById('apiKeyInput').value.trim();
             if (!key) return alert('Please enter your Torn API key');
 
             clearDebug();
-            logToDebug('Verifying API key...');
+            logToDebug('Verifying...');
             const { user, online } = await verifyAndCheckOnline(key);
             if (!user) {
-                alert('Invalid API key or Torn unreachable. Check debug log.');
+                alert('Invalid API key or Torn unreachable.');
                 return;
             }
 
@@ -328,7 +321,7 @@
             await loadAndRenderGrid();
         };
 
-        // Auto-login on load
+        // Auto-login
         (async () => {
             const savedKey = localStorage.getItem('torn_api_key');
             if (savedKey) {
