@@ -282,22 +282,24 @@
             await loadAndRenderGrid();
         }
 
-        async function clearUserData(userName) {
+        // 按用户名清除该用户的所有记录
+        async function clearUserByName(userName) {
             const url = `${SUPABASE_URL}/rest/v1/availability?user_name=eq.${encodeURIComponent(userName)}&select=id`;
             const res = await fetch(url, { headers: supabaseHeaders() });
             if (!res.ok) {
                 logToDebug('Fetch user records failed: ' + res.status);
-                return;
+                return 0;
             }
             const records = await res.json();
-            const promises = [];
-            for (const rec of records) {
-                const delUrl = `${SUPABASE_URL}/rest/v1/availability?id=eq.${rec.id}`;
-                promises.push(fetch(delUrl, { method: 'DELETE', headers: supabaseHeaders() }));
-            }
+            const promises = records.map(rec =>
+                fetch(`${SUPABASE_URL}/rest/v1/availability?id=eq.${rec.id}`, {
+                    method: 'DELETE',
+                    headers: supabaseHeaders()
+                })
+            );
             await Promise.all(promises);
             logToDebug(`🗑️ Cleared ${records.length} slots for user "${userName}".`);
-            await loadAndRenderGrid();
+            return records.length;
         }
 
         // ---------- 渲染八行交错表格 ----------
@@ -326,8 +328,6 @@
             ];
 
             let html = '<table>';
-
-            // 不设置横向表头，直接按组生成行
             html += '<tbody>';
 
             for (const group of groups) {
@@ -435,7 +435,9 @@
             const name = document.getElementById('clearUserInput').value.trim();
             if (!name) return alert('Please enter a user name');
             if (confirm(`Clear ALL availability for user "${name}"?`)) {
-                await clearUserData(name);
+                const deletedCount = await clearUserByName(name);
+                alert(`Deleted ${deletedCount} slot(s) for user "${name}".`);
+                document.getElementById('clearUserInput').value = '';
             }
         };
 
