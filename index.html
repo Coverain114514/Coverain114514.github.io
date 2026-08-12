@@ -224,6 +224,17 @@
             return await res.json();
         }
 
+        async function patchMissingName(recordId, userName) {
+            const url = `${SUPABASE_URL}/rest/v1/presence?id=eq.${recordId}`;
+            const res = await fetch(url, {
+                method: 'PATCH',
+                headers: supabaseHeaders(),
+                body: JSON.stringify({ user_name: userName })
+            });
+            if (res.ok) logToDebug('🔧 Patched missing name for record ' + recordId);
+            else logToDebug('Patch failed: ' + (await res.json()).message);
+        }
+
         // ---------- Update presence ----------
         async function updateMyPresence() {
             if (!currentUser) return;
@@ -248,13 +259,13 @@
             }
         }
 
-        // ---------- Grid rendering (auto-fill missing user names) ----------
+        // ---------- Grid rendering (only names, no times) ----------
         async function loadAndRenderGrid() {
             logToDebug('📊 Loading grid...');
             const dates = getCurrentWeekDates();
             const data = await fetchPresence(dates);
 
-            // Step 1: Build a userId -> userName map from all records that have user_name
+            // Build name map
             const nameMap = {};
             data.forEach(row => {
                 if (row.user_name && row.user_id) {
@@ -262,16 +273,20 @@
                 }
             });
 
-            // Step 2: Build cellMap, filling missing names using nameMap
+            // Patch missing names in the background
+            data.forEach(row => {
+                if (!row.user_name && row.user_id && nameMap[row.user_id]) {
+                    patchMissingName(row.id, nameMap[row.user_id]);
+                }
+            });
+
+            // Build cell map
             const cellMap = {};
             data.forEach(row => {
                 const key = `${row.date}_${row.slot}`;
-                if (!cellMap[key]) cellMap[key] = [];
+                if (!cellMap[key]) cellMap[key] = new Set();
                 const displayName = row.user_name || nameMap[row.user_id] || `ID:${row.user_id}`;
-                cellMap[key].push({
-                    userName: displayName,
-                    timestamp: row.timestamp
-                });
+                cellMap[key].add(displayName);
             });
 
             let html = '<table><thead><tr><th>Time (UTC)</th>';
@@ -285,15 +300,9 @@
                 html += `<td class="time-header">${getSlotTime(s)}</td>`;
                 dates.forEach(date => {
                     const key = `${date}_${s}`;
-                    const entries = cellMap[key] || [];
-                    if (entries.length > 0) {
-                        const content = entries.map(e => {
-                            const time = new Date(e.timestamp);
-                            const hh = String(time.getUTCHours()).padStart(2, '0');
-                            const mm = String(time.getUTCMinutes()).padStart(2, '0');
-                            return `${e.userName}<br>${hh}:${mm}`;
-                        }).join('<br>');
-                        html += `<td class="marked">${content}</td>`;
+                    const names = cellMap[key] ? Array.from(cellMap[key]) : [];
+                    if (names.length > 0) {
+                        html += `<td class="marked">${names.join('<br>')}</td>`;
                     } else {
                         html += `<td class="empty-slot"></td>`;
                     }
