@@ -52,7 +52,16 @@
             border-radius: 8px; padding: 10px; margin-bottom: 15px;
         }
         table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: fixed; }
-        th, td { border: 1px solid #21262d; padding: 8px 4px; text-align: center; font-size: 0.68rem; vertical-align: middle; }
+        th, td {
+            border: 1px solid #21262d;
+            padding: 10px 4px;
+            text-align: center;
+            font-size: 0.68rem;
+            vertical-align: middle;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
         th { background: #21262d; color: #58a6ff; position: sticky; top: 0; z-index: 3; }
 
         /* 有人的格子统一蓝色背景 */
@@ -105,7 +114,7 @@
         Signed in as <strong id="userNameDisplay"></strong> (ID: <strong id="userIdDisplay"></strong>)
     </div>
 
-    <!-- 管理员面板：清除全部 + 定向清除用户名 -->
+    <!-- 管理员面板 -->
     <div id="adminPanel" class="admin-panel">
         <button onclick="window.clearAllData()">⚠️ Clear ALL Data</button>
         <div style="margin-top:8px;">
@@ -283,9 +292,9 @@
             await loadAndRenderGrid();
         }
 
-        // ---------- 渲染单行时间表 ----------
+        // ---------- 渲染两行时间表 ----------
         function renderGrid(date, data) {
-            // 按 slot 汇总，每个 slot 存储 { userId, userName } 列表
+            // 按 slot 汇总
             const slotMap = {};
             for (let s = 0; s < SLOTS; s++) {
                 slotMap[s] = [];
@@ -300,15 +309,17 @@
                 }
             });
 
-            // 构建表格：第一行为表头（时间），第二行为格子
+            // 构建表头：48 列时间
             let html = '<table><thead><tr><th style="width:80px;">Time</th>';
             for (let s = 0; s < SLOTS; s++) {
                 html += `<th>${getSlotTime(s)}</th>`;
             }
-            html += '</tr></thead><tbody><tr>';
-            html += '<td style="font-weight:bold;">Today</td>';
+            html += '</tr></thead><tbody>';
 
-            for (let s = 0; s < SLOTS; s++) {
+            // 第一行：00:00 - 11:30 (slots 0-23)
+            html += '<tr>';
+            html += '<td style="font-weight:bold;">00:00<br>↓<br>11:30</td>';
+            for (let s = 0; s < 24; s++) {
                 const entries = slotMap[s];
                 let cls = 'empty-slot';
                 let content = '';
@@ -322,12 +333,33 @@
                 }
                 html += `<td class="${cls}" data-slot="${s}">${content}</td>`;
             }
-            html += '</tr></tbody></table>';
+            html += '</tr>';
+
+            // 第二行：12:00 - 23:30 (slots 24-47)
+            html += '<tr>';
+            html += '<td style="font-weight:bold;">12:00<br>↓<br>23:30</td>';
+            for (let s = 24; s < 48; s++) {
+                const entries = slotMap[s];
+                let cls = 'empty-slot';
+                let content = '';
+                if (entries.length > 0) {
+                    cls = 'occupied';
+                    content = entries.map(e => {
+                        const isMine = (e.userId === currentUser.id);
+                        const nameClass = isMine ? 'my-name' : 'other-name';
+                        return `<span class="${nameClass}">${e.userName}</span>`;
+                    }).join('<br>');
+                }
+                html += `<td class="${cls}" data-slot="${s}">${content}</td>`;
+            }
+            html += '</tr>';
+
+            html += '</tbody></table>';
 
             const gridContainer = document.getElementById('gridContainer');
             gridContainer.innerHTML = html;
 
-            // 绑定点击事件：所有格子都可点击（切换自己的标记）
+            // 绑定点击事件
             if (currentUser) {
                 gridContainer.querySelectorAll('td[data-slot]').forEach(td => {
                     td.addEventListener('click', async () => {
