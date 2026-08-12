@@ -142,7 +142,6 @@
             return `${h}:${m}`;
         }
 
-        // Use UTC for storage, display as UTC
         function getCurrentDateAndSlot() {
             const now = new Date();
             const year = now.getUTCFullYear();
@@ -155,7 +154,7 @@
             return { date: dateStr, slot };
         }
 
-        // Torn API
+        // ---------- Torn API ----------
         async function fetchBasic(key) {
             const url = `https://api.torn.com/user/?selections=basic&key=${key}`;
             const res = await fetch(url);
@@ -175,7 +174,7 @@
             }
         }
 
-        // Supabase REST
+        // ---------- Supabase REST ----------
         function supabaseHeaders() {
             return {
                 'apikey': SUPABASE_ANON_KEY,
@@ -206,7 +205,6 @@
                 if (res.ok) logToDebug('✅ Marked slot ' + slot);
                 else logToDebug('❌ Insert failed: ' + JSON.stringify(await res.json()));
             } else {
-                // Update timestamp (and name if changed)
                 const updateUrl = `${SUPABASE_URL}/rest/v1/presence?id=eq.${existing[0].id}`;
                 res = await fetch(updateUrl, {
                     method: 'PATCH',
@@ -226,7 +224,7 @@
             return await res.json();
         }
 
-        // Update my presence
+        // ---------- Update presence ----------
         async function updateMyPresence() {
             if (!currentUser) return;
             const savedKey = localStorage.getItem('torn_api_key');
@@ -250,19 +248,28 @@
             }
         }
 
-        // Render grid with user NAMES and times
+        // ---------- Grid rendering (auto-fill missing user names) ----------
         async function loadAndRenderGrid() {
             logToDebug('📊 Loading grid...');
             const dates = getCurrentWeekDates();
             const data = await fetchPresence(dates);
 
-            // Build cellMap: { `${date}_${slot}`: [ { userName, timestamp } ] }
+            // Step 1: Build a userId -> userName map from all records that have user_name
+            const nameMap = {};
+            data.forEach(row => {
+                if (row.user_name && row.user_id) {
+                    nameMap[row.user_id] = row.user_name;
+                }
+            });
+
+            // Step 2: Build cellMap, filling missing names using nameMap
             const cellMap = {};
             data.forEach(row => {
                 const key = `${row.date}_${row.slot}`;
                 if (!cellMap[key]) cellMap[key] = [];
+                const displayName = row.user_name || nameMap[row.user_id] || `ID:${row.user_id}`;
                 cellMap[key].push({
-                    userName: row.user_name || `ID:${row.user_id}`,
+                    userName: displayName,
                     timestamp: row.timestamp
                 });
             });
@@ -298,7 +305,7 @@
             logToDebug('Grid ready.');
         }
 
-        // Login
+        // ---------- Login ----------
         window.handleLogin = async function() {
             const key = document.getElementById('apiKeyInput').value.trim();
             if (!key) return alert('Please enter your Torn API key');
