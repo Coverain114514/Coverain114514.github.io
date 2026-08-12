@@ -55,9 +55,7 @@
         td.marked {
             background: rgba(88, 166, 255, 0.2);
             color: #c9d1d9;
-            font-weight: normal;
-            font-size: 0.68rem;
-            line-height: 1.3;
+            font-size: 0.68rem; line-height: 1.3;
         }
         td.empty-slot { color: #484f58; }
         .legend { display: flex; justify-content: center; gap: 18px; margin: 10px 0 15px; font-size: 0.8rem; }
@@ -72,34 +70,34 @@
 </head>
 <body>
     <h1>Disabled_Hijackers's members Online Schedule</h1>
-    <div class="utc-note">All times are in UTC+0</div>
+    <div class="utc-note">All times are in UTC+0 · Auto‑updates every 30 minutes</div>
 
     <div class="login-panel">
-        <input type="text" id="apiKeyInput" placeholder="Paste your Torn API key">
-        <button id="loginBtn" onclick="window.handleLogin()">🔑 Sign In</button>
+        <input type="text" id="apiKeyInput" placeholder="Paste your Torn API key (needs faction permission)">
+        <button id="loginBtn" onclick="window.handleLogin()">🔑 Start Tracking</button>
     </div>
 
     <div id="userBadge" class="user-badge" style="display:none;">
-        Signed in as <strong id="userNameDisplay"></strong> (ID: <strong id="userIdDisplay"></strong>)
+        Tracking faction: <strong id="factionNameDisplay"></strong>
     </div>
 
     <div id="onlineStatus" class="status-indicator" style="display:none;">
-        Current Torn status: <span id="statusText"></span>
+        Status: <span id="statusText"></span>
     </div>
 
-    <button id="manualRefreshBtn" class="manual-refresh" onclick="window.handleManualRefresh()">🔄 Refresh Grid Now</button>
+    <button id="manualRefreshBtn" class="manual-refresh" onclick="window.handleManualRefresh()">🔄 Refresh Now</button>
 
-    <div class="legend"><span>Member online (this week)</span></div>
+    <div class="legend"><span>Online members (last 5 min)</span></div>
 
     <div class="grid-container" id="gridContainer">
-        <p style="text-align:center;padding:30px;color:#8b949e;">Sign in to see the schedule.</p>
+        <p style="text-align:center;padding:30px;color:#8b949e;">Enter a faction API key to begin.</p>
     </div>
 
     <div class="debug-box" id="debugBox">
         <strong>🔍 Status</strong><br>
-        (Waiting for action...)
+        (Waiting for API key...)
     </div>
-    <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
+    <div class="refresh-note">Faction data refreshes every 30 minutes</div>
 
     <script>
         // ========== SUPABASE CONFIG ==========
@@ -108,9 +106,12 @@
 
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const SLOTS = 48;
+        const FACTION_REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+        const ONLINE_THRESHOLD_SEC = 300; // 5 minutes
 
-        let currentUser = null;
-        let pollInterval = null;
+        let currentKey = null;
+        let currentFactionName = '';
+        let factionPollInterval = null;
         let gridRefreshInterval = null;
 
         function logToDebug(msg) {
@@ -120,7 +121,7 @@
         }
 
         function clearDebug() {
-            document.getElementById('debugBox').innerHTML = '<strong>🔍 Status</strong><br>(Waiting for action...)';
+            document.getElementById('debugBox').innerHTML = '<strong>🔍 Status</strong><br>(Waiting for API key...)';
         }
 
         // ---------- Helpers ----------
@@ -155,23 +156,12 @@
         }
 
         // ---------- Torn API ----------
-        async function fetchBasic(key) {
-            const url = `https://api.torn.com/user/?selections=basic&key=${key}`;
+        async function fetchFactionData(key) {
+            const url = `https://api.torn.com/faction/?selections=basic,members&key=${key}`;
             const res = await fetch(url);
             const json = await res.json();
             if (json.error) throw new Error(json.error.error || json.error);
             return json;
-        }
-
-        async function verifyAndCheckOnline(key) {
-            try {
-                const data = await fetchBasic(key);
-                if (!data.player_id) throw new Error('Missing player_id');
-                return { user: { id: data.player_id, name: data.name }, online: true };
-            } catch (err) {
-                logToDebug('[Torn] Request failed: ' + err.message);
-                return { user: null, online: false };
-            }
         }
 
         // ---------- Supabase REST ----------
@@ -186,7 +176,7 @@
         async function upsertPresence(userId, userName, date, slot) {
             const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
-            if (!res.ok) { logToDebug('[Supabase] Check failed: ' + res.status); return; }
+            if (!res.ok) { logToDebug('Check failed: ' + res.status); return; }
             const existing = await res.json();
 
             if (existing.length === 0) {
@@ -194,16 +184,9 @@
                 res = await fetch(insertUrl, {
                     method: 'POST',
                     headers: supabaseHeaders(),
-                    body: JSON.stringify({
-                        user_id: userId,
-                        user_name: userName,
-                        date: date,
-                        slot: slot,
-                        timestamp: Date.now()
-                    })
+                    body: JSON.stringify({ user_id: userId, user_name: userName, date, slot, timestamp: Date.now() })
                 });
-                if (res.ok) logToDebug('✅ Marked slot ' + slot);
-                else logToDebug('❌ Insert failed: ' + JSON.stringify(await res.json()));
+                if (!res.ok) logToDebug('Insert failed: ' + JSON.stringify(await res.json()));
             } else {
                 const updateUrl = `${SUPABASE_URL}/rest/v1/presence?id=eq.${existing[0].id}`;
                 res = await fetch(updateUrl, {
@@ -211,8 +194,7 @@
                     headers: supabaseHeaders(),
                     body: JSON.stringify({ timestamp: Date.now(), user_name: userName })
                 });
-                if (res.ok) logToDebug('🔄 Updated slot ' + slot);
-                else logToDebug('❌ Update failed: ' + JSON.stringify(await res.json()));
+                if (!res.ok) logToDebug('Update failed: ' + JSON.stringify(await res.json()));
             }
         }
 
@@ -224,60 +206,57 @@
             return await res.json();
         }
 
-        async function patchMissingName(recordId, userName) {
-            const url = `${SUPABASE_URL}/rest/v1/presence?id=eq.${recordId}`;
-            const res = await fetch(url, {
-                method: 'PATCH',
-                headers: supabaseHeaders(),
-                body: JSON.stringify({ user_name: userName })
-            });
-            if (res.ok) logToDebug('🔧 Patched missing name for record ' + recordId);
-            else logToDebug('Patch failed: ' + (await res.json()).message);
-        }
-
-        // ---------- Update presence ----------
-        async function updateMyPresence() {
-            if (!currentUser) return;
-            const savedKey = localStorage.getItem('torn_api_key');
-            if (!savedKey) return;
-
+        // ---------- Faction update ----------
+        async function updateFactionPresence() {
+            if (!currentKey) return;
             clearDebug();
-            logToDebug('Checking API connection...');
-            const { user, online } = await verifyAndCheckOnline(savedKey);
+            logToDebug('🔄 Fetching faction data...');
+            try {
+                const faction = await fetchFactionData(currentKey);
+                const members = faction.members;
+                if (!members) throw new Error('No members data');
 
-            document.getElementById('onlineStatus').style.display = 'block';
-            const statusText = document.getElementById('statusText');
+                const nowSec = Math.floor(Date.now() / 1000);
+                const { date: today, slot: currentSlot } = getCurrentDateAndSlot();
 
-            if (online && user) {
-                statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
-                logToDebug(`✅ Online as ${user.name}`);
-                const { date, slot } = getCurrentDateAndSlot();
-                await upsertPresence(currentUser.id, currentUser.name, date, slot);
-            } else {
-                statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
-                logToDebug('❌ Offline or API error');
+                let updatedCount = 0;
+                const promises = [];
+
+                for (const [id, member] of Object.entries(members)) {
+                    const lastAction = member.last_action?.timestamp;
+                    if (!lastAction) continue;
+                    const secondsAgo = nowSec - lastAction;
+                    if (secondsAgo < ONLINE_THRESHOLD_SEC) {
+                        promises.push(
+                            upsertPresence(id, member.name, today, currentSlot)
+                                .then(() => { updatedCount++; })
+                        );
+                    }
+                }
+
+                await Promise.all(promises);
+                currentFactionName = faction.name || 'Faction';
+                document.getElementById('factionNameDisplay').textContent = currentFactionName;
+                document.getElementById('userBadge').style.display = 'block';
+                document.getElementById('onlineStatus').style.display = 'block';
+                document.getElementById('statusText').innerHTML = `<span class="status-online">${updatedCount} online</span>`;
+                logToDebug(`✅ Updated ${updatedCount} online members for slot ${currentSlot}`);
+            } catch (err) {
+                logToDebug('❌ Faction update failed: ' + err.message);
+                document.getElementById('statusText').innerHTML = '<span class="status-offline">Error</span>';
             }
+            await loadAndRenderGrid();
         }
 
-        // ---------- Grid rendering (only names, no times) ----------
+        // ---------- Grid rendering ----------
         async function loadAndRenderGrid() {
-            logToDebug('📊 Loading grid...');
             const dates = getCurrentWeekDates();
             const data = await fetchPresence(dates);
 
             // Build name map
             const nameMap = {};
             data.forEach(row => {
-                if (row.user_name && row.user_id) {
-                    nameMap[row.user_id] = row.user_name;
-                }
-            });
-
-            // Patch missing names in the background
-            data.forEach(row => {
-                if (!row.user_name && row.user_id && nameMap[row.user_id]) {
-                    patchMissingName(row.id, nameMap[row.user_id]);
-                }
+                if (row.user_name && row.user_id) nameMap[row.user_id] = row.user_name;
             });
 
             // Build cell map
@@ -301,60 +280,42 @@
                 dates.forEach(date => {
                     const key = `${date}_${s}`;
                     const names = cellMap[key] ? Array.from(cellMap[key]) : [];
-                    if (names.length > 0) {
-                        html += `<td class="marked">${names.join('<br>')}</td>`;
-                    } else {
-                        html += `<td class="empty-slot"></td>`;
-                    }
+                    html += `<td class="${names.length ? 'marked' : 'empty-slot'}">${names.join('<br>')}</td>`;
                 });
                 html += '</tr>';
             }
             html += '</tbody></table>';
             document.getElementById('gridContainer').innerHTML = html;
-            logToDebug('Grid ready.');
         }
 
-        // ---------- Login ----------
+        // ---------- Start tracking ----------
         window.handleLogin = async function() {
             const key = document.getElementById('apiKeyInput').value.trim();
             if (!key) return alert('Please enter your Torn API key');
 
-            clearDebug();
-            logToDebug('Verifying...');
-            const { user, online } = await verifyAndCheckOnline(key);
-            if (!user) {
-                alert('Invalid API key or Torn unreachable.');
-                return;
-            }
-
-            currentUser = user;
+            currentKey = key;
             localStorage.setItem('torn_api_key', key);
-            document.getElementById('userBadge').style.display = 'block';
-            document.getElementById('userNameDisplay').textContent = user.name;
-            document.getElementById('userIdDisplay').textContent = user.id;
-            document.getElementById('loginBtn').textContent = '🔄 Signed in';
-            logToDebug(`✅ Logged in as ${user.name}`);
 
-            if (pollInterval) clearInterval(pollInterval);
+            // Clear old intervals
+            if (factionPollInterval) clearInterval(factionPollInterval);
             if (gridRefreshInterval) clearInterval(gridRefreshInterval);
 
-            await updateMyPresence();
-            await loadAndRenderGrid();
+            // Immediate first update
+            await updateFactionPresence();
 
-            pollInterval = setInterval(updateMyPresence, 30000);
-            gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
+            // Set intervals: faction every 30 min, grid refresh every 1 min
+            factionPollInterval = setInterval(updateFactionPresence, FACTION_REFRESH_INTERVAL);
+            gridRefreshInterval = setInterval(loadAndRenderGrid, 60000);
+
+            document.getElementById('loginBtn').textContent = '🔄 Tracking...';
         };
 
         window.handleManualRefresh = async function() {
-            if (!currentUser) {
-                alert('Please sign in first.');
-                return;
-            }
-            await updateMyPresence();
-            await loadAndRenderGrid();
+            if (!currentKey) return alert('Please start tracking first.');
+            await updateFactionPresence();
         };
 
-        // Auto-login
+        // Auto-start if key was saved
         (async () => {
             const savedKey = localStorage.getItem('torn_api_key');
             if (savedKey) {
