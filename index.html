@@ -184,7 +184,7 @@
             };
         }
 
-        async function upsertPresence(userId, date, slot) {
+        async function upsertPresence(userId, userName, date, slot) {
             const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
             if (!res.ok) { logToDebug('[Supabase] Check failed: ' + res.status); return; }
@@ -195,12 +195,26 @@
                 res = await fetch(insertUrl, {
                     method: 'POST',
                     headers: supabaseHeaders(),
-                    body: JSON.stringify({ user_id: userId, date, slot, timestamp: Date.now() })
+                    body: JSON.stringify({
+                        user_id: userId,
+                        user_name: userName,
+                        date: date,
+                        slot: slot,
+                        timestamp: Date.now()
+                    })
                 });
                 if (res.ok) logToDebug('✅ Marked slot ' + slot);
                 else logToDebug('❌ Insert failed: ' + JSON.stringify(await res.json()));
             } else {
-                logToDebug('ℹ️ Already marked at slot ' + slot);
+                // Update timestamp (and name if changed)
+                const updateUrl = `${SUPABASE_URL}/rest/v1/presence?id=eq.${existing[0].id}`;
+                res = await fetch(updateUrl, {
+                    method: 'PATCH',
+                    headers: supabaseHeaders(),
+                    body: JSON.stringify({ timestamp: Date.now(), user_name: userName })
+                });
+                if (res.ok) logToDebug('🔄 Updated slot ' + slot);
+                else logToDebug('❌ Update failed: ' + JSON.stringify(await res.json()));
             }
         }
 
@@ -229,25 +243,28 @@
                 statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
                 logToDebug(`✅ Online as ${user.name}`);
                 const { date, slot } = getCurrentDateAndSlot();
-                await upsertPresence(currentUser.id, date, slot);
+                await upsertPresence(currentUser.id, currentUser.name, date, slot);
             } else {
                 statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
                 logToDebug('❌ Offline or API error');
             }
         }
 
-        // Render grid with user IDs and times
+        // Render grid with user NAMES and times
         async function loadAndRenderGrid() {
             logToDebug('📊 Loading grid...');
             const dates = getCurrentWeekDates();
             const data = await fetchPresence(dates);
 
-            // Build cellMap: { `${date}_${slot}`: [ { user_id, timestamp } ] }
+            // Build cellMap: { `${date}_${slot}`: [ { userName, timestamp } ] }
             const cellMap = {};
             data.forEach(row => {
                 const key = `${row.date}_${row.slot}`;
                 if (!cellMap[key]) cellMap[key] = [];
-                cellMap[key].push({ userId: row.user_id, timestamp: row.timestamp });
+                cellMap[key].push({
+                    userName: row.user_name || `ID:${row.user_id}`,
+                    timestamp: row.timestamp
+                });
             });
 
             let html = '<table><thead><tr><th>Time (UTC)</th>';
@@ -267,7 +284,7 @@
                             const time = new Date(e.timestamp);
                             const hh = String(time.getUTCHours()).padStart(2, '0');
                             const mm = String(time.getUTCMinutes()).padStart(2, '0');
-                            return `ID:${e.userId}<br>${hh}:${mm}`;
+                            return `${e.userName}<br>${hh}:${mm}`;
                         }).join('<br>');
                         html += `<td class="marked">${content}</td>`;
                     } else {
