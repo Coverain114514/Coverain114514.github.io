@@ -42,7 +42,7 @@
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
             padding: 12px; margin: 10px auto 20px; max-width: 700px;
             font-family: monospace; font-size: 0.75rem; color: #8b949e;
-            white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto;
+            white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto;
         }
         .grid-container {
             overflow-x: auto; background: #161b22; border: 1px solid #30363d;
@@ -155,7 +155,7 @@
             return { date: dateStr, slot };
         }
 
-        // ---------- Torn API v2 (no selections) ----------
+        // ---------- Torn API v2 ----------
         async function fetchFactionData(key) {
             const url = `https://api.torn.com/v2/faction?key=${key}`;
             const res = await fetch(url);
@@ -165,7 +165,6 @@
             }
             const json = await res.json();
             if (json.error) throw new Error(json.error.message || json.error);
-            // v2 may wrap response in "data" or return flat
             return json.data || json;
         }
 
@@ -181,7 +180,10 @@
         async function upsertPresence(userId, userName, date, slot) {
             const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
-            if (!res.ok) { logToDebug('Check failed: ' + res.status); return; }
+            if (!res.ok) {
+                logToDebug(`  ⚠️ Check failed for ${userName} (status ${res.status})`);
+                return false;
+            }
             const existing = await res.json();
 
             if (existing.length === 0) {
@@ -191,7 +193,13 @@
                     headers: supabaseHeaders(),
                     body: JSON.stringify({ user_id: userId, user_name: userName, date, slot, timestamp: Date.now() })
                 });
-                if (!res.ok) logToDebug('Insert failed: ' + JSON.stringify(await res.json()));
+                if (res.ok) {
+                    logToDebug(`  ✅ Inserted ${userName}`);
+                    return true;
+                } else {
+                    logToDebug(`  ❌ Insert failed for ${userName}: ${JSON.stringify(await res.json())}`);
+                    return false;
+                }
             } else {
                 const updateUrl = `${SUPABASE_URL}/rest/v1/presence?id=eq.${existing[0].id}`;
                 res = await fetch(updateUrl, {
@@ -199,7 +207,13 @@
                     headers: supabaseHeaders(),
                     body: JSON.stringify({ timestamp: Date.now(), user_name: userName })
                 });
-                if (!res.ok) logToDebug('Update failed: ' + JSON.stringify(await res.json()));
+                if (res.ok) {
+                    logToDebug(`  🔄 Updated ${userName}`);
+                    return true;
+                } else {
+                    logToDebug(`  ❌ Update failed for ${userName}: ${JSON.stringify(await res.json())}`);
+                    return false;
+                }
             }
         }
 
@@ -211,31 +225,44 @@
             return await res.json();
         }
 
-        // ---------- Faction update ----------
+        // ---------- Faction update with detailed diagnostics ----------
         async function updateFactionPresence() {
             if (!currentKey) return;
             clearDebug();
-            logToDebug('🔄 Fetching faction data (v2 no selections)...');
+            logToDebug('🔄 Fetching faction data (v2)...');
             try {
                 const faction = await fetchFactionData(currentKey);
                 const members = faction.members;
-                if (!members) throw new Error('No members data in response');
+                if (!members) throw new Error('No members data');
 
                 const nowSec = Math.floor(Date.now() / 1000);
                 const { date: today, slot: currentSlot } = getCurrentDateAndSlot();
+                logToDebug(`📅 Current UTC slot: ${today} / ${getSlotTime(currentSlot)}`);
 
-                let updatedCount = 0;
+                const memberEntries = Object.entries(members);
+                logToDebug(`👥 Total members in faction: ${memberEntries.length}`);
+
+                let onlineCount = 0;
+                let markedCount = 0;
                 const promises = [];
 
-                for (const [id, member] of Object.entries(members)) {
-                    const lastAction = member.last_action?.timestamp;
-                    if (!lastAction) continue;
-                    const secondsAgo = nowSec - lastAction;
+                for (const [id, member] of memberEntries) {
+                    const lastAction = member.last_action;
+                    if (!lastAction || !lastAction.timestamp) {
+                        logToDebug(`  ⏭️ ${member.name} (ID:${id}) - no last_action data, skipping`);
+                        continue;
+                    }
+                    const secondsAgo = nowSec - lastAction.timestamp;
+                    const statusLine = `  ${member.name} (ID:${id}) - last action: ${secondsAgo}s ago`;
                     if (secondsAgo < ONLINE_THRESHOLD_SEC) {
+                        onlineCount++;
+                        logToDebug(statusLine + ' ✅ ONLINE');
                         promises.push(
                             upsertPresence(id, member.name, today, currentSlot)
-                                .then(() => { updatedCount++; })
+                                .then(success => { if (success) markedCount++; })
                         );
+                    } else {
+                        logToDebug(statusLine + ' ❌ OFFLINE');
                     }
                 }
 
@@ -244,8 +271,8 @@
                 document.getElementById('factionNameDisplay').textContent = currentFactionName;
                 document.getElementById('userBadge').style.display = 'block';
                 document.getElementById('onlineStatus').style.display = 'block';
-                document.getElementById('statusText').innerHTML = `<span class="status-online">${updatedCount} online</span>`;
-                logToDebug(`✅ Updated ${updatedCount} online members for slot ${currentSlot}`);
+                document.getElementById('statusText').innerHTML = `<span class="status-online">${onlineCount} online / ${markedCount} marked</span>`;
+                logToDebug(`\n✅ Finished: ${onlineCount} online, ${markedCount} successfully written to schedule.`);
             } catch (err) {
                 logToDebug('❌ Faction update failed: ' + err.message);
                 document.getElementById('statusText').innerHTML = '<span class="status-offline">Error</span>';
