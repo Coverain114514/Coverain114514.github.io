@@ -155,13 +155,22 @@
             return { date: dateStr, slot };
         }
 
-        // ---------- Torn API ----------
+        // ---------- Torn API v2 ----------
         async function fetchFactionData(key) {
-            const url = `https://api.torn.com/faction/?selections=basic,members&key=${key}`;
-            const res = await fetch(url);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error.error || json.error);
-            return json;
+            // First attempt: v2 with selections (may fail)
+            let url = `https://api.torn.com/v2/faction?selections=basic,members&key=${key}`;
+            let res = await fetch(url);
+            let json = await res.json();
+            if (json.error) {
+                // If error, try without selections (default might include members)
+                logToDebug('v2 with selections failed, trying default...');
+                url = `https://api.torn.com/v2/faction?key=${key}`;
+                res = await fetch(url);
+                json = await res.json();
+                if (json.error) throw new Error(json.error.error || json.error);
+            }
+            // v2 may wrap response in data
+            return json.data || json;
         }
 
         // ---------- Supabase REST ----------
@@ -210,7 +219,7 @@
         async function updateFactionPresence() {
             if (!currentKey) return;
             clearDebug();
-            logToDebug('🔄 Fetching faction data...');
+            logToDebug('🔄 Fetching faction data (v2)...');
             try {
                 const faction = await fetchFactionData(currentKey);
                 const members = faction.members;
@@ -253,13 +262,11 @@
             const dates = getCurrentWeekDates();
             const data = await fetchPresence(dates);
 
-            // Build name map
             const nameMap = {};
             data.forEach(row => {
                 if (row.user_name && row.user_id) nameMap[row.user_id] = row.user_name;
             });
 
-            // Build cell map
             const cellMap = {};
             data.forEach(row => {
                 const key = `${row.date}_${row.slot}`;
@@ -296,14 +303,11 @@
             currentKey = key;
             localStorage.setItem('torn_api_key', key);
 
-            // Clear old intervals
             if (factionPollInterval) clearInterval(factionPollInterval);
             if (gridRefreshInterval) clearInterval(gridRefreshInterval);
 
-            // Immediate first update
             await updateFactionPresence();
 
-            // Set intervals: faction every 30 min, grid refresh every 1 min
             factionPollInterval = setInterval(updateFactionPresence, FACTION_REFRESH_INTERVAL);
             gridRefreshInterval = setInterval(loadAndRenderGrid, 60000);
 
