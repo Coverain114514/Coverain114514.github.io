@@ -292,7 +292,7 @@
             await loadAndRenderGrid();
         }
 
-        // ---------- 渲染两行时间表 ----------
+        // ---------- 渲染两行时间表（表头也分两行） ----------
         function renderGrid(date, data) {
             // 按 slot 汇总
             const slotMap = {};
@@ -309,14 +309,22 @@
                 }
             });
 
-            // 构建表头：48 列时间
-            let html = '<table><thead><tr><th style="width:80px;">Time</th>';
-            for (let s = 0; s < SLOTS; s++) {
+            // 构建表头：两行，每行24个时间段
+            let html = '<table><thead>';
+            // 第一行表头（00:00 - 11:30）
+            html += '<tr><th rowspan="2" style="min-width:80px;">Time</th>';
+            for (let s = 0; s < 24; s++) {
+                html += `<th>${getSlotTime(s)}</th>`;
+            }
+            html += '</tr>';
+            // 第二行表头（12:00 - 23:30）
+            html += '<tr>';
+            for (let s = 24; s < 48; s++) {
                 html += `<th>${getSlotTime(s)}</th>`;
             }
             html += '</tr></thead><tbody>';
 
-            // 第一行：00:00 - 11:30 (slots 0-23)
+            // 第一行格子（00:00 - 11:30）
             html += '<tr>';
             html += '<td style="font-weight:bold;">00:00<br>↓<br>11:30</td>';
             for (let s = 0; s < 24; s++) {
@@ -335,7 +343,7 @@
             }
             html += '</tr>';
 
-            // 第二行：12:00 - 23:30 (slots 24-47)
+            // 第二行格子（12:00 - 23:30）
             html += '<tr>';
             html += '<td style="font-weight:bold;">12:00<br>↓<br>23:30</td>';
             for (let s = 24; s < 48; s++) {
