@@ -1,4 +1,3 @@
-html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,9 +67,6 @@ html
             background: #30363d; border: 1px solid #58a6ff; color: #58a6ff;
             border-radius: 4px; cursor: pointer;
         }
-        .hint {
-            color: #f0c040; text-align: center; font-size: 0.8rem; margin-top: 5px;
-        }
     </style>
 </head>
 <body>
@@ -86,9 +82,7 @@ html
     </div>
 
     <div id="onlineStatus" class="status-indicator" style="display:none;">
-        Current check: <span id="statusText">-</span>
-        <br>
-        <span id="lastCheckInfo" style="font-size:0.8rem;color:#8b949e;"></span>
+        Current Torn status: <span id="statusText"></span>
     </div>
 
     <button id="manualRefreshBtn" class="manual-refresh" onclick="window.handleManualRefresh()">🔄 Refresh Grid Now</button>
@@ -100,10 +94,10 @@ html
     </div>
 
     <div class="debug-box" id="debugBox">
-        <strong>🔍 Activity Log</strong><br>
+        <strong>🔍 Status Log</strong><br>
+        (Click Refresh Grid Now to check connection)
     </div>
     <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
-    <div id="permissionHint" class="hint"></div>
 
     <script>
         // ========== SUPABASE CONFIG ==========
@@ -112,7 +106,6 @@ html
 
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         const SLOTS = 48;
-        const CHECK_INTERVAL = 30000; // 30 seconds
 
         let currentUser = null;
         let pollInterval = null;
@@ -125,7 +118,7 @@ html
         }
 
         function clearDebug() {
-            document.getElementById('debugBox').innerHTML = '<strong>🔍 Activity Log</strong><br>';
+            document.getElementById('debugBox').innerHTML = '<strong>🔍 Status Log</strong><br>(Click Refresh Grid Now to check connection)';
         }
 
         // ---------- Helpers ----------
@@ -147,38 +140,6 @@ html
             return `${h}:${m}`;
         }
 
-        // ---------- Torn API v1 basic only (super stable) ----------
-        async function fetchBasic(key) {
-            const url = `https://api.torn.com/user/?selections=basic&key=${key}`;
-            const res = await fetch(url);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error.error || json.error);
-            return json;
-        }
-
-        async function verifyTornKey(key) {
-            try {
-                const data = await fetchBasic(key);
-                if (!data.player_id) throw new Error('Missing player_id');
-                return { id: data.player_id, name: data.name };
-            } catch (err) {
-                logToDebug('[Torn] Verification failed: ' + err.message);
-                return null;
-            }
-        }
-
-        // Simple online check: if we can reach Torn, mark online
-        async function checkOnlineStatus(key) {
-            try {
-                await fetchBasic(key);
-                // Request succeeded -> we consider user online at this moment
-                return true;
-            } catch (err) {
-                logToDebug('[Torn] Connection failed: ' + err.message);
-                return false;
-            }
-        }
-
         function getCurrentDateAndSlot() {
             const now = new Date();
             const dateStr = now.toISOString().slice(0,10);
@@ -186,6 +147,30 @@ html
             const minutes = now.getUTCMinutes();
             const slot = hours * 2 + (minutes >= 30 ? 1 : 0);
             return { date: dateStr, slot };
+        }
+
+        // ---------- Torn API (only basic) ----------
+        async function fetchBasic(key) {
+            const url = `https://api.torn.com/user/?selections=basic&key=${key}`;
+            const res = await fetch(url);
+            const json = await res.json();
+            if (json.error) throw new Error(json.error.error || json.error);
+            return json; // { player_id, name, ... }
+        }
+
+        // Verification and online detection combined: if basic succeeds, user is online
+        async function verifyAndCheckOnline(key) {
+            try {
+                const data = await fetchBasic(key);
+                if (!data.player_id) throw new Error('Missing player_id');
+                return { 
+                    user: { id: data.player_id, name: data.name },
+                    online: true 
+                };
+            } catch (err) {
+                logToDebug('[Torn] Request failed: ' + err.message);
+                return { user: null, online: false };
+            }
         }
 
         // ---------- Supabase REST ----------
@@ -227,38 +212,33 @@ html
             return await res.json();
         }
 
-        // ---------- Update presence ----------
+        // ---------- Core update ----------
         async function updateMyPresence() {
             if (!currentUser) return;
             const savedKey = localStorage.getItem('torn_api_key');
             if (!savedKey) return;
 
-            document.getElementById('permissionHint').innerHTML = '';
             clearDebug();
-            logToDebug('Pinging Torn API...');
-            const online = await checkOnlineStatus(savedKey);
+            logToDebug('Checking API connection...');
+            const { user, online } = await verifyAndCheckOnline(savedKey);
 
             document.getElementById('onlineStatus').style.display = 'block';
             const statusText = document.getElementById('statusText');
-            const lastCheckInfo = document.getElementById('lastCheckInfo');
-            const nowStr = new Date().toLocaleTimeString();
 
-            if (online) {
-                statusText.innerHTML = '<span class="status-online">● API Reachable</span>';
-                lastCheckInfo.textContent = `Checked at ${nowStr} — marking current slot.`;
+            if (online && user) {
+                statusText.innerHTML = '<span class="status-online">● ONLINE</span>';
+                logToDebug(`✅ Connection OK – logged in as ${user.name}`);
                 const { date, slot } = getCurrentDateAndSlot();
                 await upsertPresence(currentUser.id, date, slot);
-                logToDebug(`✅ Marked online at slot ${slot}`);
             } else {
-                statusText.innerHTML = '<span class="status-offline">○ API Unreachable</span>';
-                lastCheckInfo.textContent = `Checked at ${nowStr} — not marking.`;
-                logToDebug(`⏸ Torn API not reachable, skipped marking.`);
+                statusText.innerHTML = '<span class="status-offline">○ OFFLINE</span>';
+                logToDebug('❌ API unreachable or invalid key');
             }
         }
 
         // ---------- Grid rendering ----------
         async function loadAndRenderGrid() {
-            logToDebug('Loading grid...');
+            logToDebug('Loading schedule...');
             const dates = getCurrentWeekDates();
             const data = await fetchPresence(dates);
 
@@ -287,7 +267,7 @@ html
             }
             html += '</tbody></table>';
             document.getElementById('gridContainer').innerHTML = html;
-            logToDebug('Grid rendered.');
+            logToDebug('Schedule ready.');
         }
 
         // ---------- Login ----------
@@ -296,11 +276,10 @@ html
             if (!key) return alert('Please enter your Torn API key');
 
             clearDebug();
-            document.getElementById('permissionHint').innerHTML = '';
             logToDebug('Verifying API key...');
-            const user = await verifyTornKey(key);
+            const { user, online } = await verifyAndCheckOnline(key);
             if (!user) {
-                alert('Invalid API key. See activity log for details.');
+                alert('Invalid API key or Torn unreachable. Check debug log.');
                 return;
             }
 
@@ -310,7 +289,7 @@ html
             document.getElementById('userNameDisplay').textContent = user.name;
             document.getElementById('userIdDisplay').textContent = user.id;
             document.getElementById('loginBtn').textContent = '🔄 Signed in';
-            logToDebug(`✅ Logged in as ${user.name} (ID: ${user.id})`);
+            logToDebug(`✅ Logged in as ${user.name}`);
 
             if (pollInterval) clearInterval(pollInterval);
             if (gridRefreshInterval) clearInterval(gridRefreshInterval);
@@ -318,8 +297,8 @@ html
             await updateMyPresence();
             await loadAndRenderGrid();
 
-            pollInterval = setInterval(updateMyPresence, CHECK_INTERVAL);
-            gridRefreshInterval = setInterval(loadAndRenderGrid, CHECK_INTERVAL);
+            pollInterval = setInterval(updateMyPresence, 30000);
+            gridRefreshInterval = setInterval(loadAndRenderGrid, 30000);
         };
 
         window.handleManualRefresh = async function() {
