@@ -34,13 +34,16 @@
         }
         .user-badge strong { color: #f0c040; }
         .admin-panel {
-            text-align: center; margin-bottom: 15px; display: none;
+            text-align: center; margin-bottom: 15px;
+            display: none;
         }
         .admin-panel button {
-            padding: 8px 20px; background: #c0392b; border: 1px solid #e74c3c;
+            padding: 10px 24px; background: #c0392b; border: 1px solid #e74c3c;
             border-radius: 6px; color: white; cursor: pointer; font-weight: 600;
+            font-size: 1rem;
         }
         .admin-panel button:hover { background: #e74c3c; }
+
         .grid-container {
             overflow-x: auto; background: #161b22; border: 1px solid #30363d;
             border-radius: 8px; padding: 10px; margin-bottom: 15px;
@@ -49,30 +52,41 @@
         th, td { border: 1px solid #21262d; padding: 4px 2px; text-align: center; font-size: 0.68rem; vertical-align: middle; }
         th { background: #21262d; color: #58a6ff; position: sticky; top: 0; z-index: 3; }
         .time-header { font-size: 0.65rem; white-space: nowrap; }
-        td.available {
-            background: rgba(46, 204, 113, 0.18);
-            color: #2ecc71;
-            font-weight: bold;
+
+        /* 有人的格子统一蓝色背景 */
+        td.occupied {
+            background: rgba(88, 166, 255, 0.2);
             cursor: pointer;
         }
-        td.mine {
-            background: rgba(241, 196, 15, 0.2);
-            color: #f1c40f;
-            font-weight: bold;
+        td.empty-slot {
+            color: #484f58;
             cursor: pointer;
         }
-        td.empty-slot { color: #484f58; cursor: pointer; }
         td.empty-slot:hover { background: #1e2a3a; }
+
+        /* 自己的名字：棕色 */
+        .my-name {
+            color: #c47a2b;
+            font-weight: bold;
+        }
+        /* 其他人的名字：蓝色 */
+        .other-name {
+            color: #58a6ff;
+            font-weight: bold;
+        }
+
         .legend { display: flex; justify-content: center; gap: 18px; margin: 10px 0; font-size: 0.8rem; }
         .legend span::before { content: '■'; margin-right: 5px; }
-        .legend .legend-available::before { color: rgba(46, 204, 113, 0.18); }
-        .legend .legend-mine::before { color: rgba(241, 196, 15, 0.2); }
+        .legend .legend-occupied::before { color: rgba(88, 166, 255, 0.2); }
+        .legend .legend-mine::before { content: '●'; color: #c47a2b; }
+        .legend .legend-other::before { content: '●'; color: #58a6ff; }
+
         .refresh-note { text-align: center; font-size: 0.75rem; color: #484f58; margin-top: 10px; }
         .debug-box {
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
             padding: 12px; margin: 10px auto 20px; max-width: 700px;
             font-family: monospace; font-size: 0.75rem; color: #8b949e;
-            white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto;
+            white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto;
         }
     </style>
 </head>
@@ -89,13 +103,15 @@
         Signed in as <strong id="userNameDisplay"></strong> (ID: <strong id="userIdDisplay"></strong>)
     </div>
 
+    <!-- 管理员清除按钮，JS 控制显示 -->
     <div id="adminPanel" class="admin-panel">
         <button onclick="window.clearAllData()">⚠️ Clear All Availability Data</button>
     </div>
 
     <div class="legend">
-        <span class="legend-available">Others available</span>
-        <span class="legend-mine">My availability</span>
+        <span class="legend-occupied">Occupied slot (blue background)</span>
+        <span class="legend-mine">My name (brown)</span>
+        <span class="legend-other">Other's name (blue)</span>
     </div>
 
     <div class="grid-container" id="gridContainer">
@@ -114,7 +130,7 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZ3Z6emNvam5qcXp2eWl6eXhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc0MDUsImV4cCI6MjEwMjA0MzQwNX0.RR2L4Unhzs9nZC8_FfNoiBSS5bJSOWYJVYzSTZjZR4M';
 
         const DAYS = ['Today', 'Tomorrow', 'Day+2', 'Day+3', 'Day+4', 'Day+5', 'Day+6'];
-        const SLOTS = 48; // half-hour slots
+        const SLOTS = 48;
         const ADMIN_ID = '3086281'; // Coverain114514
 
         let currentUser = null; // { id: string, name: string }
@@ -165,8 +181,8 @@
             try {
                 const data = await fetchBasic(key);
                 if (!data.player_id) throw new Error('Missing player_id');
-                // 将 player_id 转换为字符串，确保后续比较一致
-                return { id: String(data.player_id), name: data.name };
+                // 转换为字符串，确保比较一致
+                return { id: String(data.player_id).trim(), name: data.name };
             } catch (err) {
                 logToDebug('[Torn] Verification failed: ' + err.message);
                 return null;
@@ -196,8 +212,7 @@
         }
 
         async function toggleAvailability(userId, userName, date, slot) {
-            // 确保 userId 为字符串
-            const uid = String(userId);
+            const uid = String(userId).trim();
             const checkUrl = `${SUPABASE_URL}/rest/v1/availability?user_id=eq.${encodeURIComponent(uid)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
             if (!res.ok) {
@@ -262,8 +277,8 @@
             data.forEach(row => {
                 const key = `${row.date}_${row.slot}`;
                 if (!cellMap[key]) cellMap[key] = [];
-                // 确保 user_id 是字符串，方便比较
-                cellMap[key].push({ userId: String(row.user_id), userName: row.user_name || `ID:${row.user_id}` });
+                const uid = String(row.user_id).trim();
+                cellMap[key].push({ userId: uid, userName: row.user_name || `ID:${row.user_id}` });
             });
 
             let html = '<table><thead><tr><th>Time (UTC)</th>';
@@ -281,9 +296,12 @@
                     let cls = 'empty-slot';
                     let content = '';
                     if (entries.length > 0) {
-                        const myEntry = entries.find(e => e.userId === currentUser.id);
-                        if (myEntry) cls = 'mine'; else cls = 'available';
-                        content = entries.map(e => e.userName).join('<br>');
+                        cls = 'occupied'; // 统一蓝色背景
+                        content = entries.map(e => {
+                            const isMine = (e.userId === currentUser.id);
+                            const nameClass = isMine ? 'my-name' : 'other-name';
+                            return `<span class="${nameClass}">${e.userName}</span>`;
+                        }).join('<br>');
                     }
                     html += `<td class="${cls}" data-date="${date}" data-slot="${s}">${content}</td>`;
                 });
@@ -332,10 +350,11 @@
             document.getElementById('userNameDisplay').textContent = user.name;
             document.getElementById('userIdDisplay').textContent = user.id;
 
-            // 显示管理员清除按钮（现在 user.id 是字符串，可以正常比较）
+            // 显示管理员清除按钮
             const adminPanel = document.getElementById('adminPanel');
             if (user.id === ADMIN_ID) {
                 adminPanel.style.display = 'block';
+                logToDebug('✅ Admin clear button shown');
             } else {
                 adminPanel.style.display = 'none';
             }
