@@ -117,7 +117,7 @@
         const SLOTS = 48; // half-hour slots
         const ADMIN_ID = '3086281'; // Coverain114514
 
-        let currentUser = null; // { id, name }
+        let currentUser = null; // { id: string, name: string }
         let availabilityData = [];
         let gridRefreshInterval = null;
 
@@ -133,7 +133,6 @@
 
         // ---------- Helpers ----------
         function getFutureWeekDates() {
-            // Returns array of 7 dates starting from today (UTC)
             const dates = [];
             const now = new Date();
             for (let i = 0; i < 7; i++) {
@@ -166,7 +165,8 @@
             try {
                 const data = await fetchBasic(key);
                 if (!data.player_id) throw new Error('Missing player_id');
-                return { id: data.player_id, name: data.name };
+                // 将 player_id 转换为字符串，确保后续比较一致
+                return { id: String(data.player_id), name: data.name };
             } catch (err) {
                 logToDebug('[Torn] Verification failed: ' + err.message);
                 return null;
@@ -196,8 +196,9 @@
         }
 
         async function toggleAvailability(userId, userName, date, slot) {
-            // Check if already marked
-            const checkUrl = `${SUPABASE_URL}/rest/v1/availability?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
+            // 确保 userId 为字符串
+            const uid = String(userId);
+            const checkUrl = `${SUPABASE_URL}/rest/v1/availability?user_id=eq.${encodeURIComponent(uid)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
             if (!res.ok) {
                 logToDebug('Toggle check failed: ' + res.status);
@@ -206,7 +207,7 @@
             const existing = await res.json();
 
             if (existing.length > 0) {
-                // Delete own mark
+                // 删除自己的标记
                 const deleteUrl = `${SUPABASE_URL}/rest/v1/availability?id=eq.${existing[0].id}`;
                 res = await fetch(deleteUrl, { method: 'DELETE', headers: supabaseHeaders() });
                 if (res.ok) {
@@ -215,13 +216,13 @@
                     logToDebug('Delete failed: ' + (await res.json()).message);
                 }
             } else {
-                // Insert new mark
+                // 插入新标记
                 const insertUrl = `${SUPABASE_URL}/rest/v1/availability`;
                 res = await fetch(insertUrl, {
                     method: 'POST',
                     headers: supabaseHeaders(),
                     body: JSON.stringify({
-                        user_id: userId,
+                        user_id: uid,
                         user_name: userName,
                         date: date,
                         slot: slot,
@@ -257,12 +258,12 @@
 
         // ---------- Render grid ----------
         function renderGrid(dates, data) {
-            // Build cell map: { `${date}_${slot}`: [ {userId, userName} ] }
             const cellMap = {};
             data.forEach(row => {
                 const key = `${row.date}_${row.slot}`;
                 if (!cellMap[key]) cellMap[key] = [];
-                cellMap[key].push({ userId: row.user_id, userName: row.user_name || `ID:${row.user_id}` });
+                // 确保 user_id 是字符串，方便比较
+                cellMap[key].push({ userId: String(row.user_id), userName: row.user_name || `ID:${row.user_id}` });
             });
 
             let html = '<table><thead><tr><th>Time (UTC)</th>';
@@ -280,7 +281,7 @@
                     let cls = 'empty-slot';
                     let content = '';
                     if (entries.length > 0) {
-                        const myEntry = entries.find(e => e.userId === currentUser?.id);
+                        const myEntry = entries.find(e => e.userId === currentUser.id);
                         if (myEntry) cls = 'mine'; else cls = 'available';
                         content = entries.map(e => e.userName).join('<br>');
                     }
@@ -293,7 +294,7 @@
             const gridContainer = document.getElementById('gridContainer');
             gridContainer.innerHTML = html;
 
-            // Attach click handlers
+            // 绑定点击事件
             if (currentUser) {
                 gridContainer.querySelectorAll('td[data-date]').forEach(td => {
                     td.addEventListener('click', async () => {
@@ -331,7 +332,7 @@
             document.getElementById('userNameDisplay').textContent = user.name;
             document.getElementById('userIdDisplay').textContent = user.id;
 
-            // Show admin clear button if current user is admin
+            // 显示管理员清除按钮（现在 user.id 是字符串，可以正常比较）
             const adminPanel = document.getElementById('adminPanel');
             if (user.id === ADMIN_ID) {
                 adminPanel.style.display = 'block';
