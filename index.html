@@ -39,7 +39,7 @@
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
             padding: 12px; margin: 10px auto 20px; max-width: 700px;
             font-family: monospace; font-size: 0.75rem; color: #8b949e;
-            white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto;
+            white-space: pre-wrap; word-break: break-all; max-height: 250px; overflow-y: auto;
         }
         .grid-container {
             overflow-x: auto; background: #161b22; border: 1px solid #30363d;
@@ -94,8 +94,8 @@
     </div>
 
     <div class="debug-box" id="debugBox">
-        <strong>🔍 Status Log</strong><br>
-        (Click Refresh Grid Now to check connection)
+        <strong>🔍 Detailed Log</strong><br>
+        (Click Refresh Grid Now to see activity)
     </div>
     <div class="refresh-note">Auto‑checks every 30 seconds · Marks persist all week</div>
 
@@ -118,7 +118,7 @@
         }
 
         function clearDebug() {
-            document.getElementById('debugBox').innerHTML = '<strong>🔍 Status Log</strong><br>(Click Refresh Grid Now to check connection)';
+            document.getElementById('debugBox').innerHTML = '<strong>🔍 Detailed Log</strong><br>(Click Refresh Grid Now to see activity)';
         }
 
         // ---------- Helpers ----------
@@ -149,16 +149,15 @@
             return { date: dateStr, slot };
         }
 
-        // ---------- Torn API (only basic) ----------
+        // ---------- Torn API ----------
         async function fetchBasic(key) {
             const url = `https://api.torn.com/user/?selections=basic&key=${key}`;
             const res = await fetch(url);
             const json = await res.json();
             if (json.error) throw new Error(json.error.error || json.error);
-            return json; // { player_id, name, ... }
+            return json;
         }
 
-        // Verification and online detection combined: if basic succeeds, user is online
         async function verifyAndCheckOnline(key) {
             try {
                 const data = await fetchBasic(key);
@@ -183,33 +182,49 @@
         }
 
         async function upsertPresence(userId, date, slot) {
+            logToDebug(`🔄 Checking presence for user ${userId} on ${date} slot ${slot}...`);
             const checkUrl = `${SUPABASE_URL}/rest/v1/presence?user_id=eq.${encodeURIComponent(userId)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
+            logToDebug('[Supabase] Check URL: ' + checkUrl);
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
-            if (!res.ok) { logToDebug('[Supabase] Check failed: ' + res.status); return; }
+            if (!res.ok) {
+                logToDebug('[Supabase] Check failed (status ' + res.status + '): ' + (await res.text()));
+                return;
+            }
             const existing = await res.json();
+            logToDebug('[Supabase] Existing entries: ' + JSON.stringify(existing));
+
             if (existing.length === 0) {
                 const insertUrl = `${SUPABASE_URL}/rest/v1/presence`;
+                logToDebug('[Supabase] Inserting...');
                 res = await fetch(insertUrl, {
                     method: 'POST',
                     headers: supabaseHeaders(),
                     body: JSON.stringify({ user_id: userId, date, slot, timestamp: Date.now() })
                 });
-                if (res.ok) logToDebug('[Supabase] Marked slot ' + slot);
-                else logToDebug('[Supabase] Insert failed: ' + JSON.stringify(await res.json()));
+                if (res.ok) {
+                    logToDebug('✅ Marked slot ' + slot);
+                } else {
+                    const err = await res.json();
+                    logToDebug('❌ Insert failed: ' + JSON.stringify(err));
+                }
             } else {
-                logToDebug('[Supabase] Already marked at slot ' + slot);
+                logToDebug('ℹ️ Already marked, skipping insert.');
             }
         }
 
         async function fetchPresence(dates) {
             const dateList = dates.map(d => `"${d}"`).join(',');
             const url = `${SUPABASE_URL}/rest/v1/presence?date=in.(${encodeURIComponent(dateList)})&select=*`;
+            logToDebug('[Supabase] Fetch URL: ' + url);
             const res = await fetch(url, { headers: supabaseHeaders() });
             if (!res.ok) {
-                logToDebug('[Supabase] Fetch failed: ' + JSON.stringify(await res.json()));
+                const errText = await res.text();
+                logToDebug('❌ Fetch failed (status ' + res.status + '): ' + errText);
                 return [];
             }
-            return await res.json();
+            const data = await res.json();
+            logToDebug(`✅ Fetched ${data.length} presence records`);
+            return data;
         }
 
         // ---------- Core update ----------
@@ -238,7 +253,7 @@
 
         // ---------- Grid rendering ----------
         async function loadAndRenderGrid() {
-            logToDebug('Loading schedule...');
+            logToDebug('📊 Loading schedule...');
             const dates = getCurrentWeekDates();
             const data = await fetchPresence(dates);
 
@@ -248,6 +263,9 @@
                 if (!cellMap[key]) cellMap[key] = new Set();
                 cellMap[key].add(row.user_id);
             });
+
+            let totalMarks = 0;
+            for (const key in cellMap) totalMarks += cellMap[key].size;
 
             let html = '<table><thead><tr><th>Time</th>';
             dates.forEach((date, i) => {
@@ -267,7 +285,7 @@
             }
             html += '</tbody></table>';
             document.getElementById('gridContainer').innerHTML = html;
-            logToDebug('Schedule ready.');
+            logToDebug(`📌 Grid rendered with ${totalMarks} marked slots.`);
         }
 
         // ---------- Login ----------
