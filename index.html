@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Disabled_Hijackers's Availability Planner</title>
+    <title>Disabled_Hijackers's Daily Availability Planner</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -14,7 +14,7 @@
         }
         h1 { text-align: center; color: #58a6ff; margin-bottom: 8px; }
         .utc-note {
-            text-align: center; color: #FF0000; font-size: 0.85rem; margin-bottom: 15px;
+            text-align: center; color: #8b949e; font-size: 0.85rem; margin-bottom: 15px;
         }
         .login-panel {
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
@@ -51,10 +51,10 @@
             overflow-x: auto; background: #161b22; border: 1px solid #30363d;
             border-radius: 8px; padding: 10px; margin-bottom: 15px;
         }
-        table { width: 100%; border-collapse: collapse; min-width: 1200px; table-layout: fixed; }
+        table { width: 100%; border-collapse: collapse; min-width: 1600px; table-layout: fixed; }
         th, td {
             border: 1px solid #21262d;
-            padding: 4px 2px;
+            padding: 8px 4px;
             text-align: center;
             font-size: 0.65rem;
             vertical-align: middle;
@@ -68,10 +68,12 @@
         td.occupied {
             background: rgba(88, 166, 255, 0.2);
             cursor: pointer;
+            height: 50px;
         }
         td.empty-slot {
             color: #484f58;
             cursor: pointer;
+            height: 50px;
         }
         td.empty-slot:hover { background: #1e2a3a; }
 
@@ -92,6 +94,7 @@
             color: #8b949e;
             font-size: 0.6rem;
             cursor: default;
+            height: 25px;
         }
 
         .legend { display: flex; justify-content: center; gap: 18px; margin: 10px 0; font-size: 0.8rem; }
@@ -110,8 +113,8 @@
     </style>
 </head>
 <body>
-    <h1>Disabled_Hijackers's Availability Planner</h1>
-    <div class="utc-note">All times are in UTC+0 · Click a slot to toggle your availability</div>
+    <h1>Disabled_Hijackers's Daily Availability Planner</h1>
+    <div class="utc-note">Recurring daily availability (UTC+0) · Click a slot to toggle your availability</div>
 
     <div class="login-panel">
         <input type="text" id="apiKeyInput" placeholder="Paste your Torn API key">
@@ -154,6 +157,7 @@
 
         const SLOTS = 48; // 半小时段
         const ADMIN_ID = '3086281'; // Coverain114514
+        const DAILY_DATE = 'daily'; // 固定日期值，表示每日通用
 
         let currentUser = null; // { id: string, name: string }
         let gridRefreshInterval = null;
@@ -169,14 +173,6 @@
         }
 
         // ---------- Helpers ----------
-        function getTodayDate() {
-            const now = new Date();
-            const year = now.getUTCFullYear();
-            const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(now.getUTCDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
         function getSlotTime(slot) {
             const h = String(Math.floor(slot / 2)).padStart(2, '0');
             const m = slot % 2 === 0 ? '00' : '30';
@@ -212,21 +208,22 @@
             };
         }
 
-        async function fetchAvailability(date) {
-            const url = `${SUPABASE_URL}/rest/v1/availability?date=eq.${encodeURIComponent(date)}&select=*`;
+        async function fetchAvailability() {
+            // 只读取 date = "daily" 的记录
+            const url = `${SUPABASE_URL}/rest/v1/availability?date=eq.${encodeURIComponent(DAILY_DATE)}&select=*`;
             const res = await fetch(url, { headers: supabaseHeaders() });
             if (!res.ok) {
                 logToDebug('Fetch failed: ' + res.status + ' ' + (await res.text()));
                 return [];
             }
             const data = await res.json();
-            logToDebug(`✅ Fetched ${data.length} records for today`);
+            logToDebug(`✅ Fetched ${data.length} daily availability records`);
             return data;
         }
 
-        async function toggleAvailability(userId, userName, date, slot) {
+        async function toggleAvailability(userId, userName, slot) {
             const uid = String(userId).trim();
-            const checkUrl = `${SUPABASE_URL}/rest/v1/availability?user_id=eq.${encodeURIComponent(uid)}&date=eq.${encodeURIComponent(date)}&slot=eq.${slot}&select=id`;
+            const checkUrl = `${SUPABASE_URL}/rest/v1/availability?user_id=eq.${encodeURIComponent(uid)}&date=eq.${encodeURIComponent(DAILY_DATE)}&slot=eq.${slot}&select=id`;
             let res = await fetch(checkUrl, { headers: supabaseHeaders() });
             if (!res.ok) {
                 logToDebug('Toggle check failed: ' + res.status);
@@ -250,7 +247,7 @@
                     body: JSON.stringify({
                         user_id: uid,
                         user_name: userName,
-                        date: date,
+                        date: DAILY_DATE,
                         slot: slot,
                         timestamp: Date.now()
                     })
@@ -265,6 +262,7 @@
         }
 
         async function clearAllAvailability() {
+            // 清除所有记录，不论日期
             const url = `${SUPABASE_URL}/rest/v1/availability?select=id`;
             const res = await fetch(url, { headers: supabaseHeaders() });
             if (!res.ok) {
@@ -282,7 +280,6 @@
             await loadAndRenderGrid();
         }
 
-        // 按用户名清除该用户的所有记录
         async function clearUserByName(userName) {
             const url = `${SUPABASE_URL}/rest/v1/availability?user_name=eq.${encodeURIComponent(userName)}&select=id`;
             const res = await fetch(url, { headers: supabaseHeaders() });
@@ -303,7 +300,7 @@
         }
 
         // ---------- 渲染八行交错表格 ----------
-        function renderGrid(date, data) {
+        function renderGrid(data) {
             // 按 slot 汇总
             const slotMap = {};
             for (let s = 0; s < SLOTS; s++) {
@@ -363,12 +360,12 @@
             const gridContainer = document.getElementById('gridContainer');
             gridContainer.innerHTML = html;
 
-            // 绑定点击事件（仅可点击行）
+            // 绑定点击事件
             if (currentUser) {
                 gridContainer.querySelectorAll('td[data-slot]').forEach(td => {
                     td.addEventListener('click', async () => {
                         const slot = parseInt(td.dataset.slot);
-                        await toggleAvailability(currentUser.id, currentUser.name, date, slot);
+                        await toggleAvailability(currentUser.id, currentUser.name, slot);
                     });
                 });
             }
@@ -376,9 +373,8 @@
 
         async function loadAndRenderGrid() {
             if (!currentUser) return;
-            const today = getTodayDate();
-            const data = await fetchAvailability(today);
-            renderGrid(today, data);
+            const data = await fetchAvailability();
+            renderGrid(data);
         }
 
         // ---------- Login ----------
